@@ -1,37 +1,94 @@
-# ZEISS X-ray Microscopy Metadata Extractors
+# ZEISS X-ray Microscopy Data Processing Tools
 
-This repository contains two Python scripts for extracting metadata from ZEISS X-ray microscopy files (.txrm/.xrm):
+A collection of Python tools for processing and analyzing ZEISS X-ray microscopy files (.txrm/.xrm).
+
+## Tools Overview
 
 1. `MetadataExtractor.py` - Focused JSON output with summarized statistics
 2. `CompleteAPIMetadataExtractor.py` - Comprehensive CSV output with complete projection data
+3. `InteractiveTXRMProcessor.py` - Command-line interface for batch processing files
+4. `TXRMProcessorGUI.py` - Graphical interface for file selection and processing
+5. `TXRMConfigConverter.py` - Converts .txrm metadata to configuration file format
 
 ## Prerequisites
 
-- Python 2.7.14 (specifically this version)
+- Python 2.7.14 (specific version required)
 - ZEISS Scout-and-Scan™ Control System installed
-- XradiaPy libraries (comes with Scout-and-Scan™ installation)
+- XradiaPy libraries (included with Scout-and-Scan™)
+- PyCharm Community Edition (recommended IDE)
 
 ## Installation
 
 1. Install PyCharm Community Edition
-2. Configure PyCharm to use the Python interpreter from Scout-and-Scan™:
+2. Configure PyCharm to use Scout-and-Scan™ Python interpreter:
    ```
-   Default location: C:\Program Files\Carl Zeiss X-ray Microscopy\Xradia Versa\[version_number]\ScoutScan\pythonw.exe
+   Path: C:\Program Files\Carl Zeiss X-ray Microscopy\Xradia Versa\[version]\ScoutScan\pythonw.exe
    ```
 
-## MetadataExtractor.py
+## Tool Descriptions
 
-### Purpose
-Creates a single, comprehensive JSON file containing metadata with summarized statistics.
-
-### Features
-- Single JSON output file
-- Statistical summaries of projection data
-- Hierarchical organization of metadata
+### MetadataExtractor.py
+- Creates single JSON file with metadata
+- Includes statistical summaries
 - Minimal disk space usage
-- Human-readable output
+- Best for quick analysis
 
-### Output Structure
+### CompleteAPIMetadataExtractor.py
+- Creates multiple CSV files
+- Complete projection data
+- Maximum data extraction
+- Best for detailed analysis
+
+### InteractiveTXRMProcessor.py
+- Command-line interface
+- Batch processing capability
+- User control over file processing
+- Progress tracking
+
+### TXRMProcessorGUI.py
+- Graphical user interface
+- Drag-and-drop file selection
+- Progress bar and status updates
+- Real-time processing feedback
+
+### TXRMConfigConverter.py
+- Converts TXRM metadata to config format
+- Matches ZEISS configuration structure
+- Includes geometry and acquisition settings
+- Equipment-specific parameters
+
+## Usage Examples
+
+### JSON Metadata Extraction
+```python
+from MetadataExtractor import MetadataExtractor
+
+extractor = MetadataExtractor(output_dir="output")
+metadata = extractor.get_metadata("path/to/file.txrm")
+extractor.save_to_json(metadata, "path/to/file.txrm")
+```
+
+### CSV Full Data Extraction
+```python
+from CompleteAPIMetadataExtractor import CompleteAPIMetadataExtractor
+
+extractor = CompleteAPIMetadataExtractor(output_dir="output")
+data = extractor.get_complete_metadata("path/to/file.txrm")
+extractor.save_to_csv(data, "base_filename")
+```
+
+### Config File Conversion
+```python
+from TXRMConfigConverter import TXRMConfigConverter
+
+converter = TXRMConfigConverter()
+converter.create_config_from_txrm("path/to/file.txrm")
+converter.save_config("output_config.txt")
+```
+
+## Output Formats
+
+### JSON Output Structure
 ```json
 {
     "file_info": {
@@ -43,14 +100,7 @@ Creates a single, comprehensive JSON file containing metadata with summarized st
         "objective": "...",
         "pixel_size_um": "...",
         "power_watts": "...",
-        "voltage_kv": "...",
-        "filter": "...",
-        "binning": "..."
-    },
-    "image_properties": {
-        "height_pixels": "...",
-        "width_pixels": "...",
-        "total_projections": "..."
+        "voltage_kv": "..."
     },
     "projection_summary": {
         "time_span": {...},
@@ -60,74 +110,58 @@ Creates a single, comprehensive JSON file containing metadata with summarized st
 }
 ```
 
-### Usage
-```python
-extractor = MetadataExtractor(output_dir="output")
-metadata = extractor.get_metadata("path/to/file.txrm")
-extractor.save_to_json(metadata, "path/to/file.txrm")
-```
-
-## CompleteAPIMetadataExtractor.py
-
-### Purpose
-Extracts every possible metadata field according to the ZEISS API documentation, with complete projection-by-projection data.
-
-### Features
-- Multiple CSV output files
-- Complete projection data
-- Raw data preservation
-- Follows API documentation structure
-- Maximum data extraction
-
-### Output Files
+### CSV Output Files
 1. `basic_info.csv` - File information
-2. `machine_settings.csv` - Microscope settings
-3. `image_properties.csv` - Image dimensions and properties
-4. `projections.csv` - Detailed data for each projection
-5. `axes.txt` - List of available axes
+2. `machine_settings.csv` - Equipment settings
+3. `image_properties.csv` - Resolution and dimensions
+4. `projections.csv` - Detailed projection data
 
-### Usage
-```python
-extractor = CompleteAPIMetadataExtractor(output_dir="output")
-data = extractor.get_complete_metadata("path/to/file.txrm")
-extractor.save_to_csv(data, "base_filename")
+### Config File Structure
+```ini
+[General]
+Version=2.8.2.20099
+SystemName=ZEISS XRM
+
+[Geometry]
+FDD=...
+FOD=...
+VoxelSizeX=...
+VoxelSizeY=...
+
+[CT]
+NumberImages=...
+RotationSector=...
+
+[Xray]
+Voltage=...
+Current=...
+Filter=...
 ```
-
-## Key Differences
-
-| Feature | MetadataExtractor | CompleteAPIMetadataExtractor |
-|---------|------------------|----------------------------|
-| Output Format | Single JSON | Multiple CSVs |
-| Data Detail | Summarized | Complete |
-| Projection Data | Statistical Summary | Raw Data |
-| File Size | Smaller | Larger |
-| Use Case | Quick Analysis | Detailed Analysis |
 
 ## Error Handling
 
-Both extractors include:
-- Comprehensive error logging
-- Progress reporting
-- File existence checks
-- Exception handling for each metadata field
+- All tools include comprehensive error logging
+- Errors are saved to log files in output directory
+- User-friendly error messages
+- Failed operations don't stop batch processing
 
 ## Known Limitations
 
-1. Requires Scout-and-Scan™ Control System
-2. Python 2.7.14 specific
-3. Windows-only (due to ZEISS software requirements)
+1. Python 2.7.14 requirement
+2. Windows OS requirement
+3. Scout-and-Scan™ software dependency
 4. Large files may require significant processing time
 5. Memory usage scales with projection count
 
 ## Contributing
 
-When modifying these extractors:
+When modifying these tools:
 1. Maintain Python 2.7 compatibility
-2. Test with varying file sizes
-3. Update error handling as needed
-4. Document any API changes
-5. Test on workstation with ZEISS software installed
+2. Test with various file sizes
+3. Update error handling
+4. Document API changes
+5. Test on workstation with ZEISS software
 
 ## License
 
-These scripts are provided for use with ZEISS X-ray microscopy systems. Usage and distribution should comply with ZEISS software licensing terms.
+These tools are provided for use with ZEISS X-ray microscopy systems. Usage and distribution should comply with ZEISS software licensing terms.
