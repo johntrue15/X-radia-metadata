@@ -24,10 +24,13 @@ def check_admin():
 class TXRMConfigConverter:
     def __init__(self):
         self.dataset = Data.XRMData.XrmBasicDataSet()
-        self.config = ConfigParser.ConfigParser()
+        self.config = None  # Initialize as None
     
     def create_config_from_txrm(self, txrm_path):
         try:
+            # Reset config object for each new file
+            self.config = ConfigParser.ConfigParser()
+            
             self.dataset.ReadFile(txrm_path)
             self._init_config_sections()
             self._fill_general_section()
