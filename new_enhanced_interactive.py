@@ -21,7 +21,7 @@ def check_admin():
         print("\nCouldn't verify admin privileges.")
         return False
 
-class TXRMConfigConverter:
+class TXRMConfigConverter(object):
     def __init__(self):
         self.dataset = Data.XRMData.XrmBasicDataSet()
         self.config = None  # Initialize as None
@@ -119,7 +119,7 @@ class TXRMConfigConverter:
             print("Error saving config file: {0}".format(str(e)))
             return False
 
-class EnhancedTXRMProcessor:
+class EnhancedTXRMProcessor(object):
     def __init__(self, output_dir=None):
         self.dataset = Data.XRMData.XrmBasicDataSet()
         self.output_dir = output_dir or os.path.join(os.getcwd(), "metadata_output")
@@ -129,9 +129,10 @@ class EnhancedTXRMProcessor:
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
         
-        log_file = os.path.join(self.output_dir, 
-                               'processing_{0}.log'.format(
-                                   datetime.now().strftime("%Y%m%d_%H%M%S")))
+        log_file = os.path.join(
+            self.output_dir,
+            'processing_{0}.log'.format(datetime.now().strftime("%Y%m%d_%H%M%S"))
+        )
         logging.basicConfig(
             filename=log_file,
             level=logging.INFO,
@@ -139,7 +140,8 @@ class EnhancedTXRMProcessor:
         )
         self.logger = logging.getLogger(__name__)
 
-    def is_drift_file(self, file_path):
+    @staticmethod
+    def is_drift_file(file_path):
         """Check if file is a drift file based on name"""
         filename = os.path.basename(file_path).lower()
         return 'drift' in filename
@@ -153,7 +155,7 @@ class EnhancedTXRMProcessor:
         print("\nSearching for .txrm files in: {0}".format(search_path))
         
         try:
-            for root, dirs, files in os.walk(search_path):
+            for root, _, files in os.walk(search_path):
                 txrm_in_folder = [f for f in files if f.lower().endswith('.txrm')]
                 if txrm_in_folder:
                     # Filter out drift files if not included
@@ -237,7 +239,8 @@ class EnhancedTXRMProcessor:
         finally:
             gc.collect()
 
-    def _get_projection_summary(self, num_projections, axes):
+    @staticmethod
+    def _get_projection_summary(num_projections, axes):
         if num_projections == 0:
             return {}
 
@@ -393,7 +396,7 @@ class EnhancedTXRMProcessor:
     def save_to_csv(self, filename="metadata_summary.csv"):
         if not self.all_metadata:
             print("No metadata to save")
-            return
+            return None
 
         output_path = os.path.join(self.output_dir, filename)
         
