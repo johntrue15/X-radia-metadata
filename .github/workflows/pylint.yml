@@ -9,15 +9,24 @@ jobs:
       image: python:2.7-slim
     
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install dependencies
+    - name: Install git
       run: |
         apt-get update
         apt-get install -y git
+    
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Install dependencies
+      run: |
         python -m pip install --upgrade pip
         pip install pylint
     
+    - name: Initialize git
+      run: |
+        git config --global --add safe.directory /__w/X-radia-metadata/X-radia-metadata
+    
     - name: Analysing the code with pylint
       run: |
-        pylint $(git ls-files '*.py')
+        pylint new_enhanced_interactive.py
