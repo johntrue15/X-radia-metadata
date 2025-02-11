@@ -270,24 +270,24 @@ class EnhancedTXRMProcessor:
         # Collect all metadata as before
         # Fix the hyperlink format by escaping backslashes properly
         file_path = metadata['file_info']['file_path'].replace("\\", "\\\\")
-        flat_data['file_hyperlink'] = f'=HYPERLINK("{file_path}", "Click to Open")'
+        flat_data['file_hyperlink'] = '=HYPERLINK("{0}", "Click to Open")'.format(file_path)
         
         for key, value in metadata['file_info'].items():
             if key != 'file_hyperlink':
-                flat_data[f"file_{key}"] = value
+                flat_data["file_{0}".format(key)] = value
             
         for key, value in metadata['machine_settings'].items():
-            flat_data[f"machine_{key}"] = value
+            flat_data["machine_{0}".format(key)] = value
             
         for key, value in metadata['image_properties'].items():
-            flat_data[f"image_{key}"] = value
+            flat_data["image_{0}".format(key)] = value
             
         for key, value in metadata['projection_summary'].items():
             if isinstance(value, dict):
                 for subkey, subvalue in value.items():
-                    flat_data[f"proj_{key}_{subkey}"] = subvalue
+                    flat_data["proj_{0}_{1}".format(key, subkey)] = subvalue
             else:
-                flat_data[f"proj_{key}"] = value
+                flat_data["proj_{0}".format(key)] = value
         
         # Define ordered fields in the exact order needed
         ordered_fields = [
