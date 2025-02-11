@@ -268,36 +268,39 @@ class EnhancedTXRMProcessor:
         flat_data = {}
         
         # Collect all metadata as before
-        flat_data['file_hyperlink'] = metadata['file_info']['file_hyperlink']
+        # Fix the hyperlink format by escaping backslashes properly
+        file_path = metadata['file_info']['file_path'].replace("\\", "\\\\")
+        flat_data['file_hyperlink'] = f'=HYPERLINK("{file_path}", "Click to Open")'
         
         for key, value in metadata['file_info'].items():
             if key != 'file_hyperlink':
-                flat_data["file_{0}".format(key)] = value
+                flat_data[f"file_{key}"] = value
             
         for key, value in metadata['machine_settings'].items():
-            flat_data["machine_{0}".format(key)] = value
+            flat_data[f"machine_{key}"] = value
             
         for key, value in metadata['image_properties'].items():
-            flat_data["image_{0}".format(key)] = value
+            flat_data[f"image_{key}"] = value
             
         for key, value in metadata['projection_summary'].items():
             if isinstance(value, dict):
                 for subkey, subvalue in value.items():
-                    flat_data["proj_{0}_{1}".format(key, subkey)] = subvalue
+                    flat_data[f"proj_{key}_{subkey}"] = subvalue
             else:
-                flat_data["proj_{0}".format(key)] = value
+                flat_data[f"proj_{key}"] = value
         
-        # Define ordered fields
+        # Define ordered fields in the exact order needed
         ordered_fields = [
             'file_name',                    # file name of the .txrm
-            'file_hyperlink',              # link to open the file
-            'machine_voltage_kv',          # voltage
-            'machine_current_ma',          # current
-            'machine_power_watts',         # power
-            'image_total_projections',     # number of projections
-            'machine_pixel_size_um',       # pixel size
-            'proj_time_span_end_date',     # project end date
-            'proj_time_span_start_date',   # project start date
+            'file_file_path',               # full file path
+            'file_hyperlink',               # clickable link
+            'machine_voltage_kv',           # voltage
+            'machine_current_ma',           # current
+            'machine_power_watts',          # power
+            'image_total_projections',       # number of projections
+            'machine_pixel_size_um',         # pixel size
+            'proj_time_span_start_date',      # project start date
+            'proj_time_span_end_date',        # project end date
         ]
         
         # Create ordered dictionary with specified fields first
@@ -403,14 +406,14 @@ class EnhancedTXRMProcessor:
             # Convert to list and ensure our preferred order
             ordered_fields = [
                 'file_name',                    # file name of the .txrm
-                'file_hyperlink',              # link to open the file
-                'machine_voltage_kv',          # voltage
-                'machine_current_ma',          # current
-                'machine_power_watts',         # power
-                'image_total_projections',     # number of projections
-                'machine_pixel_size_um',       # pixel size
-                'proj_time_span_end_date',     # project end date
-                'proj_time_span_start_date',   # project start date
+                'file_hyperlink',               # link to open the file
+                'machine_voltage_kv',           # voltage
+                'machine_current_ma',           # current
+                'machine_power_watts',          # power
+                'image_total_projections',       # number of projections
+                'machine_pixel_size_um',         # pixel size
+                'proj_time_span_end_date',       # project end date
+                'proj_time_span_start_date',     # project start date
             ]
             
             # Create final fieldnames list with ordered fields first
@@ -449,12 +452,23 @@ def main():
             print("Exiting...")
             return
 
-    processor = EnhancedTXRMProcessor()
-    
     search_path = raw_input("\nEnter folder path containing .txrm files: ").strip('"')
     while not os.path.exists(search_path):
         print("Path does not exist!")
         search_path = raw_input("Enter a valid folder path: ").strip('"')
+    
+    # Ask user where to save metadata output
+    save_location = get_user_input(
+        "\nWhere would you like to save the metadata output folder?\n"
+        "1. Current working directory\n"
+        "2. Same directory as TXRM files\n"
+        "Enter (1/2): ",
+        ['1', '2']
+    )
+    
+    # Set output directory based on user choice
+    output_dir = os.getcwd() if save_location == '1' else search_path
+    processor = EnhancedTXRMProcessor(output_dir=os.path.join(output_dir, "metadata_output"))
     
     # Ask about processing drift files
     include_drift = get_user_input(
