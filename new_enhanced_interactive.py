@@ -33,29 +33,22 @@ class TXRMConfigConverter(object):
             
             self.dataset.ReadFile(txrm_path)
             self._init_config_sections()
-            self._fill_general_section()
             self._fill_geometry_section()
-            self._fill_ct_section()
+            self._fill_ct_and_xray_section()  # Combined CT and Xray
             self._fill_image_section()
             self._fill_detector_section()
-            self._fill_xray_section()
             self._fill_axis_section()
+            self._fill_general_section()
             return True
         except Exception as e:
             print("Error processing TXRM file: {0}".format(str(e)))
             return False
     
     def _init_config_sections(self):
-        sections = ['General', 'Geometry', 'CT', 'Image', 'Detector', 'Xray', 'Axis']
+        # Remove Xray from sections list
+        sections = ['Geometry', 'CT', 'Image', 'Detector', 'Axis', 'General']
         for section in sections:
             self.config.add_section(section)
-    
-    def _fill_general_section(self):
-        self.config.set('General', 'Version', '2.8.2.20099')
-        self.config.set('General', 'Version-pca', '2')
-        self.config.set('General', 'Comment', '')
-        self.config.set('General', 'LoadDefault', '1')
-        self.config.set('General', 'SystemName', 'ZEISS XRM')
     
     def _fill_geometry_section(self):
         idx = 0
@@ -64,12 +57,23 @@ class TXRMConfigConverter(object):
         self.config.set('Geometry', 'VoxelSizeX', str(self.dataset.GetPixelSize()))
         self.config.set('Geometry', 'VoxelSizeY', str(self.dataset.GetPixelSize()))
     
-    def _fill_ct_section(self):
+    def _fill_ct_and_xray_section(self):
+        # CT data
         num_projections = self.dataset.GetProjections()
         self.config.set('CT', 'NumberImages', str(num_projections))
         self.config.set('CT', 'Type', '0')
         self.config.set('CT', 'RotationSector', '360.00000000')
         self.config.set('CT', 'NrImgDone', str(num_projections))
+        
+        # Add Xray data to CT section
+        voltage = self.dataset.GetVoltage()  # in kV
+        power = self.dataset.GetPower()      # in W
+        current = (power / voltage) * 100 if voltage != 0 else 0  # Calculate current in µA
+        
+        self.config.set('CT', 'Voltage', str(int(voltage)))
+        self.config.set('CT', 'Power', str(int(power)))
+        self.config.set('CT', 'Current', str(int(current)))
+        self.config.set('CT', 'Filter', str(self.dataset.GetFilter()))
     
     def _fill_image_section(self):
         width = self.dataset.GetWidth()
@@ -89,19 +93,6 @@ class TXRMConfigConverter(object):
         self.config.set('Detector', 'NrPixelsX', str(self.dataset.GetWidth()))
         self.config.set('Detector', 'NrPixelsY', str(self.dataset.GetHeight()))
     
-    def _fill_xray_section(self):
-        voltage = self.dataset.GetVoltage()  # in kV
-        power = self.dataset.GetPower()      # in W
-        
-        # Calculate current (I = P/V) and convert to mA
-        # Power is in W, voltage is in kV, so multiply by 1000 to get mA
-        current = (power / voltage) * 1000 if voltage != 0 else 0
-        
-        self.config.set('Xray', 'Voltage', str(int(voltage)))
-        self.config.set('Xray', 'Power', str(int(power)))
-        self.config.set('Xray', 'Current', str(int(current)))
-        self.config.set('Xray', 'Filter', str(self.dataset.GetFilter()))
-    
     def _fill_axis_section(self):
         idx = 0
         axes = self.dataset.GetAxesNames()
@@ -110,14 +101,31 @@ class TXRMConfigConverter(object):
             clean_name = axis.replace(" ", "")
             self.config.set('Axis', clean_name, str(pos))
     
+    def _fill_general_section(self):
+        self.config.set('General', 'Version', '2.8.2.20099')
+        self.config.set('General', 'Version-pca', '2')
+        self.config.set('General', 'Comment', '')
+        self.config.set('General', 'LoadDefault', '1')
+        self.config.set('General', 'SystemName', 'ZEISS XRM')
+    
     def save_config(self, output_path):
         try:
+            # Save with sections in the desired order (Xray removed)
             with open(output_path, 'w') as configfile:
-                self.config.write(configfile)
+                for section in ['Geometry', 'CT', 'Image', 'Detector', 'Axis', 'General']:
+                    self.write_section(section, configfile)
             return True
         except Exception as e:
             print("Error saving config file: {0}".format(str(e)))
             return False
+
+    def write_section(self, section, configfile):
+        """Helper method to write a section in the desired format"""
+        configfile.write('[{0}]\n'.format(section))
+        for option in self.config.options(section):
+            value = self.config.get(section, option)
+            configfile.write('{0} = {1}\n'.format(option, value))
+        configfile.write('\n')
 
 class EnhancedTXRMProcessor(object):
     def __init__(self, output_dir=None):
@@ -190,44 +198,94 @@ class EnhancedTXRMProcessor(object):
         
         return txrm_files
 
+    def _calculate_scan_time(self, start_time, end_time):
+        """Calculate and format scan time"""
+        if not (start_time and end_time):
+            return ''
+        
+        time_diff = end_time - start_time
+        
+        # Convert to hours, minutes, seconds
+        total_seconds = int(time_diff.total_seconds())
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
     def get_metadata(self, file_path):
         try:
             print("\nProcessing file: {0}".format(file_path))
             self.dataset.ReadFile(file_path)
             
-            voltage = self.dataset.GetVoltage()  # in kV
-            power = self.dataset.GetPower()      # in W
-            current = (power / voltage) * 1000 if voltage != 0 else 0  # Calculate current in mA
-            
-            axes = self.dataset.GetAxesNames()
-            num_projections = self.dataset.GetProjections()
-            
+            # Basic file info
             metadata = {
-                "file_info": {
-                    "file_path": file_path,
-                    "file_hyperlink": '=HYPERLINK("{0}", "Click to Open")'.format(
-                        file_path.replace("\\", "\\\\")),
-                    "file_name": os.path.basename(file_path),
-                    "folder_path": os.path.dirname(file_path),
-                    "acquisition_complete": self.dataset.IsInitializedCorrectly()
+                'file_info': {
+                    'file_path': file_path,
+                    'file_name': self.dataset.GetName(),
+                    'folder_path': os.path.dirname(file_path),
+                    'acquisition_complete': self.dataset.IsInitializedCorrectly()
                 },
-                "machine_settings": {
-                    "objective": self.dataset.GetObjective(),
-                    "pixel_size_um": self.dataset.GetPixelSize(),
-                    "power_watts": power,
-                    "voltage_kv": voltage,
-                    "current_ma": current,
-                    "filter": self.dataset.GetFilter(),
-                    "binning": self.dataset.GetBinning()
+                'machine_settings': {
+                    'objective': self.dataset.GetObjective(),
+                    'pixel_size_um': self.dataset.GetPixelSize(),
+                    'power_watts': self.dataset.GetPower(),
+                    'voltage_kv': self.dataset.GetVoltage(),
+                    'filter': self.dataset.GetFilter(),
+                    'binning': self.dataset.GetBinning()
                 },
-                "image_properties": {
-                    "height_pixels": self.dataset.GetHeight(),
-                    "width_pixels": self.dataset.GetWidth(),
-                    "total_projections": num_projections
-                },
-                "projection_summary": self._get_projection_summary(num_projections, axes)
+                'image_properties': {
+                    'height_pixels': self.dataset.GetHeight(),
+                    'width_pixels': self.dataset.GetWidth(),
+                    'total_projections': self.dataset.GetProjections()
+                }
             }
-            
+
+            # Get projection data
+            num_projections = metadata['image_properties']['total_projections']
+            if num_projections > 0:
+                # Get first and last projection data
+                first_proj = {
+                    'time_span': {
+                        'start_date': self.dataset.GetDate(0),
+                        'end_date': self.dataset.GetDate(num_projections - 1)
+                    },
+                    'exposure': self.dataset.GetExposure(0),
+                    'detector_to_ra_distance': self.dataset.GetDetectorToRADistance(0),
+                    'source_to_ra_distance': self.dataset.GetSourceToRADistance(0)
+                }
+
+                # Get axis positions
+                axes = self.dataset.GetAxesNames()
+                for axis in axes:
+                    first_pos = self.dataset.GetAxisPosition(0, axis)
+                    last_pos = self.dataset.GetAxisPosition(num_projections - 1, axis)
+                    clean_name = axis.replace(" ", "_")
+                    first_proj[f"{clean_name}_start"] = first_pos
+                    first_proj[f"{clean_name}_end"] = last_pos
+                    first_proj[f"{clean_name}_range"] = last_pos - first_pos
+
+                metadata['projection_summary'] = first_proj
+
+            # Calculate derived values
+            if metadata['machine_settings']['voltage_kv'] != 0:
+                current_ua = (metadata['machine_settings']['power_watts'] / 
+                             metadata['machine_settings']['voltage_kv']) * 100 if voltage != 0 else 0
+                metadata['machine_settings']['current_ua'] = current_ua
+
+            # Calculate real dimensions
+            pixel_size = metadata['machine_settings']['pixel_size_um']
+            metadata['image_properties']['width_real'] = (
+                metadata['image_properties']['width_pixels'] * pixel_size)
+            metadata['image_properties']['height_real'] = (
+                metadata['image_properties']['height_pixels'] * pixel_size)
+
+            # Calculate scan time if timestamps available
+            if 'projection_summary' in metadata:
+                start_time = metadata['projection_summary']['time_span']['start_date']
+                end_time = metadata['projection_summary']['time_span']['end_date']
+                metadata['projection_summary']['scan_time'] = self._calculate_scan_time(start_time, end_time)
+
             self.all_metadata.append(self._flatten_metadata(metadata))
             return metadata
 
@@ -267,81 +325,125 @@ class EnhancedTXRMProcessor(object):
             print("Error creating projection summary: {0}".format(str(e)))
             return {}
 
-    def _flatten_metadata(self, metadata):
-        flat_data = {}
-        
-        # Collect all metadata as before
-        # Fix the hyperlink format by escaping backslashes properly
-        file_path = metadata['file_info']['file_path'].replace("\\", "\\\\")
-        flat_data['file_hyperlink'] = '=HYPERLINK("{0}", "Click to Open")'.format(file_path)
-        
-        for key, value in metadata['file_info'].items():
-            if key != 'file_hyperlink':
-                flat_data["file_{0}".format(key)] = value
-            
-        for key, value in metadata['machine_settings'].items():
-            flat_data["machine_{0}".format(key)] = value
-            
-        for key, value in metadata['image_properties'].items():
-            flat_data["image_{0}".format(key)] = value
-            
-        for key, value in metadata['projection_summary'].items():
-            if isinstance(value, dict):
-                for subkey, subvalue in value.items():
-                    flat_data["proj_{0}_{1}".format(key, subkey)] = subvalue
-            else:
-                flat_data["proj_{0}".format(key)] = value
-        
-        # Define ordered fields in the exact order needed
-        ordered_fields = [
-            'file_name',                    # file name of the .txrm
-            'file_file_path',               # full file path
-            'file_hyperlink',               # clickable link
-            'machine_voltage_kv',           # voltage
-            'machine_current_ma',           # current
-            'machine_power_watts',          # power
-            'image_total_projections',       # number of projections
-            'machine_pixel_size_um',         # pixel size
-            'proj_time_span_start_date',      # project start date
-            'proj_time_span_end_date',        # project end date
-        ]
-        
-        # Create ordered dictionary with specified fields first
-        ordered_data = {}
-        
-        # Add ordered fields first
-        for field in ordered_fields:
-            ordered_data[field] = flat_data.get(field, '')
-        
-        # Add remaining fields
-        for key in flat_data:
-            if key not in ordered_fields:
-                ordered_data[key] = flat_data[key]
-        
-        return ordered_data
+    EXPECTED_COLUMNS = [
+        'FILE NAME',                                    # minus .txrm
+        'File hyperlink',                              # clickable link
+        'CT: Voxel size (um)',                         # from machine_pixel_size_um
+        'CT: Objective',                               # from machine_objective
+        'CT: Number of images',                        # from image_total_projections
+        'CT: Optical magnification',                   # if 4x,20x,40x then yes else no
+        'X-ray Tube: voltage',                         # from machine_voltage_kv
+        'X-ray Tube: power (W)',                       # from machine_power_watts
+        'Xray tube: current (uA)',                     # (power_watts/voltage_kv)*100
+        'X-ray: Filter',                               # from machine_filter
+        'Detector: Binning',                           # from machine_binning
+        'Detector: capture time (s)',                  # from proj_exposure
+        'Detector: Averaging',                         # from proj_projection_count
+        'Image width (pixels)',                        # from image_width_pixels
+        'Image height (pixels)',                       # from image_height_pixels
+        'Image width real',                            # width_pixels * pixel_size_um
+        'Image height real',                           # height_pixels * pixel_size_um
+        'Scan time',                                   # end_date - start_date
+        'Start time',                                  # from proj_time_span_end_date
+        'End time',                                    # from proj_time_span_start_date
+        'TXRM File path',                              # from file_file_path
+        'File path',                                   # from file_folder_path
+        'Acquisition stage successful?',               # from file_acquisition_complete
+        'Sample: X-axis start position',               # from proj_Sample X_start
+        'Sample: X-axis end position',                 # from proj_Sample X_end
+        'Sample: X-axis range',                        # from proj_Sample X_range
+        'Sample: Y-axis start position',               # from proj_Sample Y_start
+        'Sample: Y-axis end position',                 # from proj_Sample Y_end
+        'Sample: Y-axis range',                        # from proj_Sample Y_range
+        'Sample: Z-axis start position',               # from proj_Sample Z_start
+        'Sample: Z-axis end position',                 # from proj_Sample Z_end
+        'Sample: Z-axis range (um)',                   # from proj_Sample Z_range
+        'Sample: rotation start position',             # from proj_Sample Theta_start
+        'Sample: rotation end position',               # from proj_Sample Theta_end
+        'Sample: rotation range',                      # from proj_Sample Theta_range
+        'Source: X-axis start position',               # from proj_Source X_start
+        'Source: Z-axis start position',               # from proj_Source Z_start
+        'Source: Z-axis end position',                 # from proj_Source Z_end
+        'Source: X-axis end position',                 # from proj_Source X_end
+        'Source: Z-axis range',                        # from proj_Source Z_range
+        'Detector: Flat panel Z-axis start position',  # from proj_Flat Panel Z_start
+        'Detector: Flat panel Z-axis end position',    # from proj_Flat Panel Z_end
+        'Detector: flat panel range',                  # from proj_Flat Panel Z_range
+        'Detector: Flat panel X-axis start position',  # from proj_Flat Panel X_start
+        'Detector: Flat panel X-axis end position',    # from proj_Flat Panel X_end
+        'Sample: Flat panel X-axis range',             # from proj_Flat Panel X_range
+        'Detector: Z-axis start position',             # from proj_Detector Z_start
+        'Detector: Z-axis end position',               # from proj_Detector Z_end
+        '???: Z-axis start position',                  # from proj_CCD_Z_start
+        '???: X-axis start position',                  # from proj_CCD_X_start
+        '???: Z-axis end position',                    # from proj_CCD_Z_end
+        '???: Final X-axis position',                  # from proj_CCD_X_end
+        '???: X-axis range',                           # from proj_CCD_X_range
+        '???: Z-axis range'                            # from proj_CCD_Z_range
+    ]
 
-    def save_individual_csv(self, metadata, file_path):
-        """Save a single row CSV file next to the TXRM file"""
-        try:
-            csv_path = os.path.splitext(file_path)[0] + '_metadata.csv'
-            flat_metadata = self._flatten_metadata(metadata)
-            
-            # Use all fields from the flattened metadata
-            fieldnames = flat_metadata.keys()
-            
-            with open(csv_path, 'wb') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerow(flat_metadata)
-                
-            print("Individual CSV saved to: {0}".format(csv_path))
-            return True
-            
-        except Exception as e:
-            error_msg = "Error saving individual CSV: {0}".format(str(e))
-            print(error_msg)
-            self.logger.error(error_msg)
-            return False
+    def _flatten_metadata(self, metadata):
+        # Create a dictionary with all possible fields initialized to empty string
+        flat_data = {col: '' for col in self.EXPECTED_COLUMNS}
+        
+        # Get base filename without extension
+        file_path = metadata['file_info']['file_path']
+        base_filename = os.path.splitext(os.path.basename(file_path))[0]
+        
+        # Map the metadata to the expected column names
+        flat_data.update({
+            'FILE NAME': base_filename,
+            'File hyperlink': '=HYPERLINK("{0}", "Click to Open")'.format(file_path.replace("\\", "\\\\")),
+            'CT: Voxel size (um)': metadata['machine_settings']['pixel_size_um'],
+            'CT: Objective': metadata['machine_settings']['objective'],
+            'CT: Number of images': metadata['image_properties']['total_projections'],
+            'CT: Optical magnification': 'yes' if any(x in str(metadata['machine_settings'].get('objective', '')).lower() 
+                                                    for x in ['4x', '20x', '40x']) else 'no',
+            'X-ray Tube: voltage': metadata['machine_settings']['voltage_kv'],
+            'X-ray Tube: power (W)': metadata['machine_settings']['power_watts'],
+            'Xray tube: current (uA)': (metadata['machine_settings']['power_watts'] / 
+                                      metadata['machine_settings']['voltage_kv'] * 100  # Changed to *100
+                                      if metadata['machine_settings']['voltage_kv'] != 0 else 0),
+            'X-ray: Filter': metadata['machine_settings']['filter'],
+            'Detector: Binning': metadata['machine_settings']['binning'],
+            'Detector: capture time (s)': metadata['projection_summary'].get('exposure', ''),
+            'Detector: Averaging': metadata['projection_summary'].get('projection_count', ''),
+            'Image width (pixels)': metadata['image_properties']['width_pixels'],
+            'Image height (pixels)': metadata['image_properties']['height_pixels'],
+            'Image width real': metadata['image_properties']['width_real'],  # Changed to match exactly
+            'Image height real': metadata['image_properties']['height_real'],  # Changed to match exactly
+            'Scan time': metadata['projection_summary'].get('scan_time', ''),
+            'Start time': metadata['projection_summary']['time_span']['start_date'].strftime('%Y-%m-%d %H:%M:%S')  # Swapped start/end
+                         if metadata['projection_summary']['time_span']['start_date'] else '',
+            'End time': metadata['projection_summary']['time_span']['end_date'].strftime('%Y-%m-%d %H:%M:%S')  # Swapped start/end
+                       if metadata['projection_summary']['time_span']['end_date'] else '',
+            'TXRM File path': metadata['file_info']['file_path'],
+            'File path': metadata['file_info']['folder_path'],
+            'Acquisition stage successful?': metadata['file_info']['acquisition_complete']
+        })
+
+        # Map axis positions to the expected column names
+        axis_mapping = {
+            'Sample_X': 'Sample: X-axis',
+            'Sample_Y': 'Sample: Y-axis',
+            'Sample_Z': 'Sample: Z-axis',
+            'Sample_Theta': 'Sample: rotation',
+            'Source_X': 'Source: X-axis',
+            'Source_Z': 'Source: Z-axis',
+            'Flat_Panel_Z': 'Detector: Flat panel Z-axis',
+            'Flat_Panel_X': 'Detector: Flat panel X-axis'
+        }
+
+        for orig_name, column_prefix in axis_mapping.items():
+            for suffix, column_suffix in [('start', 'start position'), 
+                                        ('end', 'end position'), 
+                                        ('range', 'range')]:
+                proj_key = f'proj_{orig_name}_{suffix}'
+                if proj_key in metadata['projection_summary']:
+                    column_name = f'{column_prefix} {column_suffix}'
+                    flat_data[column_name] = metadata['projection_summary'][proj_key]
+
+        return flat_data
 
     def process_single_file(self, file_path):
         try:
@@ -361,9 +463,6 @@ class EnhancedTXRMProcessor(object):
                     print("Failed to save configuration file!")
             else:
                 print("Failed to create configuration!")
-            
-            # Save individual CSV file
-            self.save_individual_csv(metadata, file_path)
             
             # Create individual log file
             log_filename = os.path.splitext(os.path.basename(file_path))[0] + '_processing.log'
@@ -393,6 +492,40 @@ class EnhancedTXRMProcessor(object):
         finally:
             gc.collect()
 
+    def verify_columns(self, csv_path):
+        """Verify that all expected columns are present and in correct order"""
+        try:
+            with open(csv_path, 'rb') as csvfile:
+                reader = csv.reader(csvfile)
+                header = next(reader)
+                
+                # Check if all columns are present
+                missing = set(self.EXPECTED_COLUMNS) - set(header)
+                extra = set(header) - set(self.EXPECTED_COLUMNS)
+                
+                # Check order
+                order_correct = header == self.EXPECTED_COLUMNS
+                
+                print("\nColumn Verification Results:")
+                if missing:
+                    print("Missing columns:", missing)
+                if extra:
+                    print("Extra columns:", extra)
+                if not order_correct:
+                    print("Column order does not match expected order")
+                    for i, (exp, got) in enumerate(zip(self.EXPECTED_COLUMNS, header)):
+                        if exp != got:
+                            print(f"Position {i}: Expected '{exp}', Got '{got}'")
+                
+                if not missing and not extra and order_correct:
+                    print("✓ All columns present and in correct order")
+                    return True
+                return False
+                
+        except Exception as e:
+            print(f"Error verifying columns: {str(e)}")
+            return False
+
     def save_to_csv(self, filename="metadata_summary.csv"):
         if not self.all_metadata:
             print("No metadata to save")
@@ -401,37 +534,17 @@ class EnhancedTXRMProcessor(object):
         output_path = os.path.join(self.output_dir, filename)
         
         try:
-            # Collect all possible fieldnames from all metadata entries
-            all_fieldnames = set()
-            for metadata in self.all_metadata:
-                all_fieldnames.update(metadata.keys())
-            
-            # Convert to list and ensure our preferred order
-            ordered_fields = [
-                'file_name',                    # file name of the .txrm
-                'file_hyperlink',               # link to open the file
-                'machine_voltage_kv',           # voltage
-                'machine_current_ma',           # current
-                'machine_power_watts',          # power
-                'image_total_projections',       # number of projections
-                'machine_pixel_size_um',         # pixel size
-                'proj_time_span_end_date',       # project end date
-                'proj_time_span_start_date',     # project start date
-            ]
-            
-            # Create final fieldnames list with ordered fields first
-            fieldnames = ordered_fields + [f for f in all_fieldnames if f not in ordered_fields]
-            
             with open(output_path, 'wb') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames, extrasaction='ignore')
+                writer = csv.DictWriter(csvfile, fieldnames=self.EXPECTED_COLUMNS)
                 writer.writeheader()
-                
-                # Ensure all rows have all fields (with empty strings for missing fields)
                 for row in self.all_metadata:
-                    complete_row = {field: row.get(field, '') for field in fieldnames}
-                    writer.writerow(complete_row)
+                    writer.writerow(row)
             
             print("\nMetadata summary saved to: {0}".format(output_path))
+            
+            # Verify columns after saving
+            self.verify_columns(output_path)
+            
             return output_path
             
         except Exception as e:
@@ -524,8 +637,8 @@ def main():
         processor.save_to_csv(csv_filename)
     
     print("\nProcessing complete!")
-    print("Check each .txrm location for config files")
     print("Check the 'metadata_output' folder for the CSV summary.")
+    print("Check each .txrm location for config files")
 
 if __name__ == "__main__":
     main()
