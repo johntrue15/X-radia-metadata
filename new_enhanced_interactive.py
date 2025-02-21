@@ -1,15 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function  # Import print function for compatibility
 import os
-import sys
-import json
 import csv
 import ctypes
 import ConfigParser
-from XradiaPy import Data
-from datetime import datetime
 import logging
 import gc
+from datetime import datetime
+from XradiaPy import Data
 
 def check_admin():
     try:
@@ -76,58 +74,6 @@ class TXRMConfigConverter(object):
         self.config.set('CT', 'Power', str(int(power)))
         self.config.set('CT', 'Current', str(int(current)))
         self.config.set('CT', 'Filter', str(self.dataset.GetFilter()))
-    
-    def _fill_image_section(self):
-        width = self.dataset.GetWidth()
-        height = self.dataset.GetHeight()
-        self.config.set('Image', 'DimX', str(width))
-        self.config.set('Image', 'DimY', str(height))
-        self.config.set('Image', 'Top', '0')
-        self.config.set('Image', 'Left', '0')
-        self.config.set('Image', 'Bottom', str(height-1))
-        self.config.set('Image', 'Right', str(width-1))
-    
-    def _fill_detector_section(self):
-        idx = 0
-        self.config.set('Detector', 'Binning', str(self.dataset.GetBinning()))
-        self.config.set('Detector', 'BitPP', '16')
-        self.config.set('Detector', 'TimingVal', str(self.dataset.GetExposure(idx)))
-        self.config.set('Detector', 'NrPixelsX', str(self.dataset.GetWidth()))
-        self.config.set('Detector', 'NrPixelsY', str(self.dataset.GetHeight()))
-    
-    def _fill_axis_section(self):
-        idx = 0
-        axes = self.dataset.GetAxesNames()
-        for axis in axes:
-            pos = self.dataset.GetAxisPosition(idx, axis)
-            clean_name = axis.replace(" ", "")
-            self.config.set('Axis', clean_name, str(pos))
-    
-    def _fill_general_section(self):
-        self.config.set('General', 'Version', '2.8.2.20099')
-        self.config.set('General', 'Version-pca', '2')
-        self.config.set('General', 'Comment', '')
-        self.config.set('General', 'LoadDefault', '1')
-        self.config.set('General', 'SystemName', 'ZEISS XRM')
-    
-    def save_config(self, output_path):
-        try:
-            # Save with sections in the desired order (Xray removed)
-            with open(output_path, 'w') as configfile:
-                for section in ['Geometry', 'CT', 'Image', 'Detector', 'Axis', 'General']:
-                    self.write_section(section, configfile)
-            return True
-        except Exception as e:
-            print("Error saving config file: {0}".format(str(e)))
-            return False
-
-    def write_section(self, section, configfile):
-        """Helper method to write a section in the desired format"""
-        configfile.write('[{0}]\n'.format(section))
-        for option in self.config.options(section):
-            value = self.config.get(section, option)
-            configfile.write('{0} = {1}\n'.format(option, value))
-        configfile.write('\n')
 
 class EnhancedTXRMProcessor(object):
     def __init__(self, output_dir=None):
@@ -155,65 +101,6 @@ class EnhancedTXRMProcessor(object):
         """Check if file is a drift file based on name"""
         filename = os.path.basename(file_path).lower()
         return 'drift' in filename
-
-    def find_txrm_files(self, search_path, include_drift=False):
-        txrm_files = []
-        folder_structure = {}
-        total_files = 0
-        drift_files = 0
-        
-        print("\nSearching for .txrm files in: {0}".format(search_path))
-        
-        try:
-            for root, _, files in os.walk(search_path):
-                txrm_in_folder = [f for f in files if f.lower().endswith('.txrm')]
-                if txrm_in_folder:
-                    # Filter out drift files if not included
-                    if not include_drift:
-                        txrm_in_folder = [f for f in txrm_in_folder if not self.is_drift_file(f)]
-                    
-                    rel_path = os.path.relpath(root, search_path)
-                    folder_structure[rel_path] = len(txrm_in_folder)
-                    total_files += len(txrm_in_folder)
-                    
-                    for file in txrm_in_folder:
-                        full_path = os.path.join(root, file)
-                        txrm_files.append(full_path)
-                        if self.is_drift_file(file):
-                            drift_files += 1
-                        print("Found: {0}".format(full_path))
-
-            print("\nFolder Structure Summary:")
-            for folder, count in folder_structure.items():
-                print("  {0}: {1} TXRM files".format(folder, count))
-            print("\nTotal TXRM files found: {0}".format(total_files))
-            if drift_files > 0:
-                print("Drift files {0}: {1}".format(
-                    "included" if include_drift else "excluded",
-                    drift_files
-                ))
-        
-        except Exception as e:
-            error_msg = "Directory search error: {0}".format(str(e))
-            print(error_msg)
-            self.logger.error(error_msg)
-        
-        return txrm_files
-
-    def _calculate_scan_time(self, start_time, end_time):
-        """Calculate and format scan time"""
-        if not (start_time and end_time):
-            return ''
-        
-        time_diff = end_time - start_time
-        
-        # Convert to hours, minutes, seconds
-        total_seconds = int(time_diff.total_seconds())
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-        seconds = total_seconds % 60
-        
-        return "{:02d}:{:02d}:{:02d}".format(hours, minutes, seconds)
 
     def get_metadata(self, file_path):
         try:
@@ -306,201 +193,6 @@ class EnhancedTXRMProcessor(object):
             self.all_metadata.append(self._flatten_metadata(metadata))
             return metadata
 
-        except Exception as e:
-            error_msg = "Error processing file {0}: {1}".format(file_path, str(e))
-            self.logger.error(error_msg)
-            print(error_msg)
-            return None
-        finally:
-            gc.collect()
-
-    @staticmethod
-    def _get_projection_summary(num_projections, axes):
-        if num_projections == 0:
-            return {}
-
-        try:
-            summary = {
-                "projection_count": num_projections,
-                "time_span": {
-                    "start_date": self.dataset.GetDate(0),
-                    "end_date": self.dataset.GetDate(num_projections - 1)
-                },
-                "exposure": self.dataset.GetExposure(0)
-            }
-
-            for axis in axes:
-                first_pos = self.dataset.GetAxisPosition(0, axis)
-                last_pos = self.dataset.GetAxisPosition(num_projections - 1, axis)
-                summary["{0}_start".format(axis)] = first_pos
-                summary["{0}_end".format(axis)] = last_pos
-                summary["{0}_range".format(axis)] = last_pos - first_pos
-
-            return summary
-
-        except Exception as e:
-            print("Error creating projection summary: {0}".format(str(e)))
-            return {}
-
-    EXPECTED_COLUMNS = [
-        'FILE NAME',                                    # minus .txrm
-        'File hyperlink',                              # clickable link
-        'CT: Voxel size (um)',                         # from machine_pixel_size_um
-        'CT: Objective',                               # from machine_objective
-        'CT: Number of images',                        # from image_total_projections
-        'CT: Optical magnification',                   # if 4x,20x,40x then yes else no
-        'X-ray Tube: voltage',                         # from machine_voltage_kv
-        'X-ray Tube: power (W)',                       # from machine_power_watts
-        'Xray tube: current (uA)',                     # (power_watts/voltage_kv)*100
-        'X-ray: Filter',                               # from machine_filter
-        'Detector: Binning',                           # from machine_binning
-        'Detector: capture time (s)',                  # from proj_exposure
-        'Detector: Averaging',                         # from proj_projection_count
-        'Image width (pixels)',                        # from image_width_pixels
-        'Image height (pixels)',                       # from image_height_pixels
-        'Image width real',                            # width_pixels * pixel_size_um
-        'Image height real',                           # height_pixels * pixel_size_um
-        'Scan time',                                   # end_date - start_date
-        'Start time',                                  # from proj_time_span_end_date
-        'End time',                                    # from proj_time_span_start_date
-        'TXRM File path',                              # from file_file_path
-        'File path',                                   # from file_folder_path
-        'Acquisition stage successful?',               # from file_acquisition_complete
-        'Sample: X-axis start position',               # from proj_Sample X_start
-        'Sample: X-axis end position',                 # from proj_Sample X_end
-        'Sample: X-axis range',                        # from proj_Sample X_range
-        'Sample: Y-axis start position',               # from proj_Sample Y_start
-        'Sample: Y-axis end position',                 # from proj_Sample Y_end
-        'Sample: Y-axis range',                        # from proj_Sample Y_range
-        'Sample: Z-axis start position',               # from proj_Sample Z_start
-        'Sample: Z-axis end position',                 # from proj_Sample Z_end
-        'Sample: Z-axis range (um)',                   # from proj_Sample Z_range
-        'Sample: rotation start position',             # from proj_Sample Theta_start
-        'Sample: rotation end position',               # from proj_Sample Theta_end
-        'Sample: rotation range',                      # from proj_Sample Theta_range
-        'Source: X-axis start position',               # from proj_Source X_start
-        'Source: Z-axis start position',               # from proj_Source Z_start
-        'Source: Z-axis end position',                 # from proj_Source Z_end
-        'Source: X-axis end position',                 # from proj_Source X_end
-        'Source: Z-axis range',                        # from proj_Source Z_range
-        'Detector: Flat panel Z-axis start position',  # from proj_Flat Panel Z_start
-        'Detector: Flat panel Z-axis end position',    # from proj_Flat Panel Z_end
-        'Detector: flat panel range',                  # from proj_Flat Panel Z_range
-        'Detector: Flat panel X-axis start position',  # from proj_Flat Panel X_start
-        'Detector: Flat panel X-axis end position',    # from proj_Flat Panel X_end
-        'Sample: Flat panel X-axis range',             # from proj_Flat Panel X_range
-        'Detector: Z-axis start position',             # from proj_Detector Z_start
-        'Detector: Z-axis end position',               # from proj_Detector Z_end
-        '???: Z-axis start position',                  # from proj_CCD_Z_start
-        '???: X-axis start position',                  # from proj_CCD_X_start
-        '???: Z-axis end position',                    # from proj_CCD_Z_end
-        '???: Final X-axis position',                  # from proj_CCD_X_end
-        '???: X-axis range',                           # from proj_CCD_X_range
-        '???: Z-axis range'                            # from proj_CCD_Z_range
-    ]
-
-    def _flatten_metadata(self, metadata):
-        # Create a dictionary with all possible fields initialized to empty string
-        flat_data = {col: '' for col in self.EXPECTED_COLUMNS}
-        
-        # Get base filename without extension
-        file_path = metadata['file_info']['file_path']
-        base_filename = os.path.splitext(os.path.basename(file_path))[0]
-        
-        # Map the metadata to the expected column names
-        flat_data.update({
-            'FILE NAME': base_filename,
-            'File hyperlink': '=HYPERLINK("{0}", "Click to Open")'.format(file_path.replace("\\", "\\\\")),
-            'CT: Voxel size (um)': metadata['machine_settings']['pixel_size_um'],
-            'CT: Objective': metadata['machine_settings']['objective'],
-            'CT: Number of images': metadata['image_properties']['total_projections'],
-            'CT: Optical magnification': 'yes' if any(x in str(metadata['machine_settings'].get('objective', '')).lower() 
-                                                        for x in ['4x', '20x', '40x']) else 'no',
-            'X-ray Tube: voltage': metadata['machine_settings']['voltage_kv'],
-            'X-ray Tube: power (W)': metadata['machine_settings']['power_watts'],
-            'Xray tube: current (uA)': (metadata['machine_settings']['power_watts'] / 
-                                          metadata['machine_settings']['voltage_kv'] * 100  
-                                          if metadata['machine_settings']['voltage_kv'] != 0 else 0),
-            'X-ray: Filter': metadata['machine_settings']['filter'],
-            'Detector: Binning': metadata['machine_settings']['binning'],
-            'Detector: capture time (s)': metadata['projection_summary'].get('exposure', ''),
-            'Detector: Averaging': metadata['projection_summary'].get('projection_count', ''),
-            'Image width (pixels)': metadata['image_properties']['width_pixels'],
-            'Image height (pixels)': metadata['image_properties']['height_pixels'],
-            'Image width real': metadata['image_properties']['width_real'],
-            'Image height real': metadata['image_properties']['height_real'],
-            'Scan time': metadata['projection_summary'].get('scan_time', ''),
-            'Start time': metadata['projection_summary']['time_span']['start_date'].strftime('%Y-%m-%d %H:%M:%S') 
-                         if metadata['projection_summary']['time_span']['start_date'] else '',
-            'End time': metadata['projection_summary']['time_span']['end_date'].strftime('%Y-%m-%d %H:%M:%S') 
-                       if metadata['projection_summary']['time_span']['end_date'] else '',
-            'TXRM File path': metadata['file_info']['file_path'],
-            'File path': metadata['file_info']['folder_path'],
-            'Acquisition stage successful?': metadata['file_info']['acquisition_complete']
-        })
-
-        # Map axis positions to the expected column names
-        axis_mapping = {
-            'Sample_X': 'Sample: X-axis',
-            'Sample_Y': 'Sample: Y-axis',
-            'Sample_Z': 'Sample: Z-axis',
-            'Sample_Theta': 'Sample: rotation',
-            'Source_X': 'Source: X-axis',
-            'Source_Z': 'Source: Z-axis',
-            'Flat_Panel_Z': 'Detector: Flat panel Z-axis',
-            'Flat_Panel_X': 'Detector: Flat panel X-axis'
-        }
-
-        for orig_name, column_prefix in axis_mapping.items():
-            for suffix, column_suffix in [('start', 'start position'), 
-                                            ('end', 'end position'), 
-                                            ('range', 'range')]:
-                proj_key = 'proj_{}_{}'.format(orig_name, suffix)
-                if proj_key in metadata['projection_summary']:
-                    column_name = '{} {}'.format(column_prefix, column_suffix)
-                    flat_data[column_name] = metadata['projection_summary'][proj_key]
-
-        return flat_data
-
-    def process_single_file(self, file_path):
-        try:
-            print("\nProcessing: {0}".format(file_path))
-            
-            # Get metadata
-            metadata = self.get_metadata(file_path)
-            if not metadata:
-                return None
-            
-            # Generate config file
-            config_path = os.path.splitext(file_path)[0] + "_config.txt"
-            if self.config_converter.create_config_from_txrm(file_path):
-                if self.config_converter.save_config(config_path):
-                    print("Configuration saved to: {0}".format(config_path))
-                else:
-                    print("Failed to save configuration file!")
-            else:
-                print("Failed to create configuration!")
-            
-            # Create individual log file
-            log_filename = os.path.splitext(os.path.basename(file_path))[0] + '_processing.log'
-            log_path = os.path.join(os.path.dirname(file_path), log_filename)
-            
-            # Create a file handler for this specific log
-            file_handler = logging.FileHandler(log_path)
-            file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-            self.logger.addHandler(file_handler)
-            
-            # Log processing information
-            self.logger.info("Processing completed for: %s", file_path)
-            self.logger.info("Metadata extracted successfully")
-            self.logger.info("Configuration file saved to: %s", config_path)
-            
-            # Remove the file handler
-            self.logger.removeHandler(file_handler)
-            file_handler.close()
-            
-            return metadata
-            
         except Exception as e:
             error_msg = "Error processing file {0}: {1}".format(file_path, str(e))
             self.logger.error(error_msg)
