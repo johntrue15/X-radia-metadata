@@ -102,95 +102,84 @@ class EnhancedTXRMProcessor(object):
         filename = os.path.basename(file_path).lower()
         return 'drift' in filename
 
-    def get_metadata(self, file_path):
+    def get_basic_info(self):
+        return {
+            'file_name': self.dataset.GetName(),
+            'initialized_correctly': self.dataset.IsInitializedCorrectly()
+        }
+
+    def get_machine_settings(self):
+        return {
+            'objective': self.dataset.GetObjective(),
+            'pixel_size': self.dataset.GetPixelSize(),
+            'power': self.dataset.GetPower(),
+            'voltage': self.dataset.GetVoltage(),
+            'filter': self.dataset.GetFilter(),
+            'binning': self.dataset.GetBinning()
+        }
+
+    def get_image_properties(self):
+        return {
+            'height': self.dataset.GetHeight(),
+            'width': self.dataset.GetWidth(),
+            'total_projections': self.dataset.GetProjections()
+        }
+
+    def get_axis_positions(self, projection_idx):
+        axis_data = {}
+        axis_names = self.dataset.GetAxesNames()
+        print("Available axes: {0}".format(", ".join(axis_names)))
+        
+        for axis in axis_names:
+            pos = self.dataset.GetAxisPosition(projection_idx, axis)
+            axis_data["{0}_pos".format(axis.replace(" ", "_"))] = pos
+        return axis_data
+
+    def get_projection_data(self, projection_idx):
+        proj_data = {
+            'projection_number': projection_idx,
+            'date': self.dataset.GetDate(projection_idx),
+            'detector_to_ra_distance': self.dataset.GetDetectorToRADistance(projection_idx),
+            'source_to_ra_distance': self.dataset.GetSourceToRADistance(projection_idx),
+            'exposure': self.dataset.GetExposure(projection_idx)
+        }
+        
+        # Add axis positions
+        proj_data.update(self.get_axis_positions(projection_idx))
+        return proj_data
+
+    def get_complete_metadata(self, file_path):
         try:
-            self.logger.debug("Starting to process file: {}".format(file_path))  # Debug log
-            print("\nProcessing file: {0}".format(file_path))
+            print("Processing file: {0}".format(file_path))
             self.dataset.ReadFile(file_path)
             
+            metadata = {}
+            
             # Basic file info
-            metadata = {
-                'file_info': {
-                    'file_path': file_path,
-                    'file_name': self.dataset.GetName(),
-                    'folder_path': os.path.dirname(file_path),
-                    'acquisition_complete': self.dataset.IsInitializedCorrectly()
-                },
-                'machine_settings': {
-                    'objective': self.dataset.GetObjective(),
-                    'pixel_size_um': self.dataset.GetPixelSize(),
-                    'power_watts': self.dataset.GetPower(),
-                    'voltage_kv': self.dataset.GetVoltage(),
-                    'filter': self.dataset.GetFilter(),
-                    'binning': self.dataset.GetBinning()
-                },
-                'image_properties': {
-                    'height_pixels': self.dataset.GetHeight(),
-                    'width_pixels': self.dataset.GetWidth(),
-                    'total_projections': self.dataset.GetProjections()
-                }
-            }
+            metadata['basic_info'] = self.get_basic_info()
+            
+            # Machine settings
+            metadata['machine_settings'] = self.get_machine_settings()
+            
+            # Image properties
+            metadata['image_properties'] = self.get_image_properties()
+            
+            # Get data for all projections
+            print("Getting data for {0} projections...".format(metadata['image_properties']['total_projections']))
+            
+            projection_data = []
+            for idx in range(metadata['image_properties']['total_projections']):
+                if idx % 10 == 0:  # Progress update every 10 projections
+                    print("Processing projection {0} of {1}...".format(
+                        idx + 1, metadata['image_properties']['total_projections']))
+                proj_data = self.get_projection_data(idx)
+                projection_data.append(proj_data)
+            
+            metadata['projection_data'] = projection_data
 
-            self.logger.debug("Metadata after initial setup: {}".format(metadata))  # Debug log
+            # Get axes names (for reference)
+            metadata['available_axes'] = self.dataset.GetAxesNames()
 
-            # Get projection data
-            num_projections = metadata['image_properties']['total_projections']
-            self.logger.debug("Number of projections: {}".format(num_projections))  # Debug log
-
-            if num_projections > 0:
-                # Get first and last projection data
-                first_proj = {
-                    'time_span': {
-                        'start_date': self.dataset.GetDate(0),
-                        'end_date': self.dataset.GetDate(num_projections - 1)
-                    },
-                    'exposure': self.dataset.GetExposure(0),
-                    'detector_to_ra_distance': self.dataset.GetDetectorToRADistance(0),
-                    'source_to_ra_distance': self.dataset.GetSourceToRADistance(0)
-                }
-
-                self.logger.debug("First projection data: {}".format(first_proj))  # Debug log
-
-                # Convert start_date and end_date to datetime objects
-                start_date_str = first_proj['time_span']['start_date']
-                end_date_str = first_proj['time_span']['end_date']
-
-                # Assuming the date format is known, e.g., '%Y-%m-%d %H:%M:%S'
-                start_date = datetime.strptime(start_date_str, '%Y-%m-%d %H:%M:%S') if start_date_str else None
-                end_date = datetime.strptime(end_date_str, '%Y-%m-%d %H:%M:%S') if end_date_str else None
-
-                # Calculate scan time if both dates are valid
-                if start_date and end_date:
-                    scan_time = end_date - start_date
-                    first_proj['scan_time'] = str(scan_time)  # Store scan time as a string if needed
-
-                # Get axis positions
-                axes = self.dataset.GetAxesNames()
-                for axis in axes:
-                    first_pos = self.dataset.GetAxisPosition(0, axis)
-                    last_pos = self.dataset.GetAxisPosition(num_projections - 1, axis)
-                    clean_name = axis.replace(" ", "_")
-                    first_proj[clean_name + "_start"] = first_pos
-                    first_proj[clean_name + "_end"] = last_pos
-                    first_proj[clean_name + "_range"] = last_pos - first_pos
-
-                metadata['projection_summary'] = first_proj
-                self.logger.debug("Projection summary: {}".format(metadata['projection_summary']))  # Debug log
-
-            # Calculate derived values
-            if metadata['machine_settings']['voltage_kv'] != 0:
-                current_ua = (metadata['machine_settings']['power_watts'] / 
-                             metadata['machine_settings']['voltage_kv']) * 100 if metadata['machine_settings']['voltage_kv'] != 0 else 0
-                metadata['machine_settings']['current_ua'] = current_ua
-
-            # Calculate real dimensions
-            pixel_size = metadata['machine_settings']['pixel_size_um']
-            metadata['image_properties']['width_real'] = (
-                metadata['image_properties']['width_pixels'] * pixel_size)
-            metadata['image_properties']['height_real'] = (
-                metadata['image_properties']['height_pixels'] * pixel_size)
-
-            self.all_metadata.append(self._flatten_metadata(metadata))
             return metadata
 
         except Exception as e:
@@ -198,68 +187,58 @@ class EnhancedTXRMProcessor(object):
             self.logger.error(error_msg)
             print(error_msg)
             return None
-        finally:
-            gc.collect()
 
-    def verify_columns(self, csv_path):
-        """Verify that all expected columns are present and in correct order"""
-        try:
-            with open(csv_path, 'rb') as csvfile:
-                reader = csv.reader(csvfile)
-                header = next(reader)
-                
-                # Check if all columns are present
-                missing = set(self.EXPECTED_COLUMNS) - set(header)
-                extra = set(header) - set(self.EXPECTED_COLUMNS)
-                
-                # Check order
-                order_correct = header == self.EXPECTED_COLUMNS
-                
-                print("\nColumn Verification Results:")
-                if missing:
-                    print("Missing columns:", missing)
-                if extra:
-                    print("Extra columns:", extra)
-                if not order_correct:
-                    print("Column order does not match expected order")
-                    for i, (exp, got) in enumerate(zip(self.EXPECTED_COLUMNS, header)):
-                        print("Position {}: Expected '{}', Got '{}'".format(i, exp, got))
-                
-                if not missing and not extra and order_correct:
-                    print("✓ All columns present and in correct order")
-                    return True
-                return False
-                
-        except Exception as e:
-            print("Error verifying columns: {}".format(str(e)))
-            return False
+    def save_to_csv(self, data, base_filename):
+        if not data:
+            print("No data to save")
+            return
 
-    def save_to_csv(self, filename="metadata_summary.csv"):
-        if not self.all_metadata:
-            print("No metadata to save")
-            return None
-
-        output_path = os.path.join(self.output_dir, filename)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        try:
-            with open(output_path, 'wb') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=self.EXPECTED_COLUMNS)
-                writer.writeheader()
-                for row in self.all_metadata:
-                    writer.writerow(row)
-            
-            print("\nMetadata summary saved to: {0}".format(output_path))
-            
-            # Verify columns after saving
-            self.verify_columns(output_path)
-            
-            return output_path
-            
-        except Exception as e:
-            error_msg = "Error saving CSV: {0}".format(str(e))
-            print(error_msg)
-            self.logger.error(error_msg)
-            return None
+        # Save basic info
+        for section in ['basic_info', 'machine_settings', 'image_properties']:
+            if section in data:
+                section_path = os.path.join(
+                    self.output_dir, 
+                    "{0}_{1}_{2}.csv".format(base_filename, section, timestamp)
+                )
+                try:
+                    with open(section_path, 'wb') as csvfile:
+                        writer = csv.DictWriter(csvfile, fieldnames=data[section].keys())
+                        writer.writeheader()
+                        writer.writerow(data[section])
+                    print("{0} saved to {1}".format(section, section_path))
+                except Exception as e:
+                    print("Error saving {0}: {1}".format(section, str(e)))
+
+        # Save projection data
+        if 'projection_data' in data and data['projection_data']:
+            proj_path = os.path.join(
+                self.output_dir, 
+                "{0}_projections_{1}.csv".format(base_filename, timestamp)
+            )
+            try:
+                with open(proj_path, 'wb') as csvfile:
+                    writer = csv.DictWriter(csvfile, fieldnames=data['projection_data'][0].keys())
+                    writer.writeheader()
+                    writer.writerows(data['projection_data'])
+                print("Projection data saved to {0}".format(proj_path))
+            except Exception as e:
+                print("Error saving projection data: {0}".format(str(e)))
+
+        # Save available axes list
+        if 'available_axes' in data:
+            axes_path = os.path.join(
+                self.output_dir, 
+                "{0}_axes_{1}.txt".format(base_filename, timestamp)
+            )
+            try:
+                with open(axes_path, 'w') as f:
+                    f.write("Available axes:\n")
+                    f.write("\n".join(data['available_axes']))
+                print("Axes list saved to {0}".format(axes_path))
+            except Exception as e:
+                print("Error saving axes list: {0}".format(str(e)))
 
     def find_txrm_files(self, search_path, include_drift=False):
         txrm_files = []
@@ -304,6 +283,53 @@ class EnhancedTXRMProcessor(object):
             self.logger.error(error_msg)
         
         return txrm_files
+
+    def process_single_file(self, file_path):
+        try:
+            print("\nProcessing: {}".format(file_path))
+            
+            # Get metadata
+            metadata = self.get_complete_metadata(file_path)
+            if not metadata:
+                return None
+            
+            # Generate config file
+            config_path = os.path.splitext(file_path)[0] + "_config.txt"
+            if self.config_converter.create_config_from_txrm(file_path):
+                if self.config_converter.save_config(config_path):
+                    print("Configuration saved to: {}".format(config_path))
+                else:
+                    print("Failed to save configuration file!")
+            else:
+                print("Failed to create configuration!")
+            
+            # Create individual log file
+            log_filename = os.path.splitext(os.path.basename(file_path))[0] + '_processing.log'
+            log_path = os.path.join(os.path.dirname(file_path), log_filename)
+            
+            # Create a file handler for this specific log
+            file_handler = logging.FileHandler(log_path)
+            file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+            self.logger.addHandler(file_handler)
+            
+            # Log processing information
+            self.logger.info("Processing completed for: %s", file_path)
+            self.logger.info("Metadata extracted successfully")
+            self.logger.info("Configuration file saved to: %s", config_path)
+            
+            # Remove the file handler
+            self.logger.removeHandler(file_handler)
+            file_handler.close()
+            
+            return metadata
+            
+        except Exception as e:
+            error_msg = "Error processing file {0}: {1}".format(file_path, str(e))
+            self.logger.error(error_msg)
+            print(error_msg)
+            return None
+        finally:
+            gc.collect()
 
 def get_user_input(prompt, valid_responses=None):
     """Get user input with validation"""
