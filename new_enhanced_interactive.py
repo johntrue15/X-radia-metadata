@@ -261,6 +261,50 @@ class EnhancedTXRMProcessor(object):
             self.logger.error(error_msg)
             return None
 
+    def find_txrm_files(self, search_path, include_drift=False):
+        txrm_files = []
+        folder_structure = {}
+        total_files = 0
+        drift_files = 0
+        
+        print("\nSearching for .txrm files in: {}".format(search_path))
+        
+        try:
+            for root, _, files in os.walk(search_path):
+                txrm_in_folder = [f for f in files if f.lower().endswith('.txrm')]
+                if txrm_in_folder:
+                    # Filter out drift files if not included
+                    if not include_drift:
+                        txrm_in_folder = [f for f in txrm_in_folder if not self.is_drift_file(f)]
+                    
+                    rel_path = os.path.relpath(root, search_path)
+                    folder_structure[rel_path] = len(txrm_in_folder)
+                    total_files += len(txrm_in_folder)
+                    
+                    for file in txrm_in_folder:
+                        full_path = os.path.join(root, file)
+                        txrm_files.append(full_path)
+                        if self.is_drift_file(file):
+                            drift_files += 1
+                        print("Found: {}".format(full_path))
+
+            print("\nFolder Structure Summary:")
+            for folder, count in folder_structure.items():
+                print("  {}: {} TXRM files".format(folder, count))
+            print("\nTotal TXRM files found: {}".format(total_files))
+            if drift_files > 0:
+                print("Drift files {}: {}".format(
+                    "included" if include_drift else "excluded",
+                    drift_files
+                ))
+        
+        except Exception as e:
+            error_msg = "Directory search error: {}".format(str(e))
+            print(error_msg)
+            self.logger.error(error_msg)
+        
+        return txrm_files
+
 def get_user_input(prompt, valid_responses=None):
     """Get user input with validation"""
     while True:
