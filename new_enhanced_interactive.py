@@ -408,12 +408,12 @@ class EnhancedTXRMProcessor(object):
             'CT: Objective': metadata['machine_settings']['objective'],
             'CT: Number of images': metadata['image_properties']['total_projections'],
             'CT: Optical magnification': 'yes' if any(x in str(metadata['machine_settings'].get('objective', '')).lower() 
-                                                    for x in ['4x', '20x', '40x']) else 'no',
+                                                        for x in ['4x', '20x', '40x']) else 'no',
             'X-ray Tube: voltage': metadata['machine_settings']['voltage_kv'],
             'X-ray Tube: power (W)': metadata['machine_settings']['power_watts'],
             'Xray tube: current (uA)': (metadata['machine_settings']['power_watts'] / 
-                                      metadata['machine_settings']['voltage_kv'] * 100  
-                                      if metadata['machine_settings']['voltage_kv'] != 0 else 0),
+                                          metadata['machine_settings']['voltage_kv'] * 100  
+                                          if metadata['machine_settings']['voltage_kv'] != 0 else 0),
             'X-ray: Filter': metadata['machine_settings']['filter'],
             'Detector: Binning': metadata['machine_settings']['binning'],
             'Detector: capture time (s)': metadata['projection_summary'].get('exposure', ''),
@@ -446,8 +446,8 @@ class EnhancedTXRMProcessor(object):
 
         for orig_name, column_prefix in axis_mapping.items():
             for suffix, column_suffix in [('start', 'start position'), 
-                                        ('end', 'end position'), 
-                                        ('range', 'range')]:
+                                            ('end', 'end position'), 
+                                            ('range', 'range')]:
                 proj_key = 'proj_{}_{}'.format(orig_name, suffix)
                 if proj_key in metadata['projection_summary']:
                     column_name = '{} {}'.format(column_prefix, column_suffix)
