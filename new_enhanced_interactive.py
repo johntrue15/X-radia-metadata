@@ -263,9 +263,9 @@ class EnhancedTXRMProcessor(object):
                     first_pos = self.dataset.GetAxisPosition(0, axis)
                     last_pos = self.dataset.GetAxisPosition(num_projections - 1, axis)
                     clean_name = axis.replace(" ", "_")
-                    first_proj[f"{clean_name}_start"] = first_pos
-                    first_proj[f"{clean_name}_end"] = last_pos
-                    first_proj[f"{clean_name}_range"] = last_pos - first_pos
+                    first_proj[clean_name + "_start"] = first_pos
+                    first_proj[clean_name + "_end"] = last_pos
+                    first_proj[clean_name + "_range"] = last_pos - first_pos
 
                 metadata['projection_summary'] = first_proj
 
