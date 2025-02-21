@@ -145,7 +145,7 @@ class EnhancedTXRMProcessor(object):
         )
         logging.basicConfig(
             filename=log_file,
-            level=logging.INFO,
+            level=logging.DEBUG,  # Set to DEBUG to capture all logs
             format='%(asctime)s - %(levelname)s - %(message)s'
         )
         self.logger = logging.getLogger(__name__)
@@ -217,6 +217,7 @@ class EnhancedTXRMProcessor(object):
 
     def get_metadata(self, file_path):
         try:
+            self.logger.debug("Starting to process file: {}".format(file_path))  # Debug log
             print("\nProcessing file: {0}".format(file_path))
             self.dataset.ReadFile(file_path)
             
@@ -243,8 +244,12 @@ class EnhancedTXRMProcessor(object):
                 }
             }
 
+            self.logger.debug("Metadata after initial setup: {}".format(metadata))  # Debug log
+
             # Get projection data
             num_projections = metadata['image_properties']['total_projections']
+            self.logger.debug("Number of projections: {}".format(num_projections))  # Debug log
+
             if num_projections > 0:
                 # Get first and last projection data
                 first_proj = {
@@ -257,6 +262,8 @@ class EnhancedTXRMProcessor(object):
                     'source_to_ra_distance': self.dataset.GetSourceToRADistance(0)
                 }
 
+                self.logger.debug("First projection data: {}".format(first_proj))  # Debug log
+
                 # Get axis positions
                 axes = self.dataset.GetAxesNames()
                 for axis in axes:
@@ -268,6 +275,7 @@ class EnhancedTXRMProcessor(object):
                     first_proj[clean_name + "_range"] = last_pos - first_pos
 
                 metadata['projection_summary'] = first_proj
+                self.logger.debug("Projection summary: {}".format(metadata['projection_summary']))  # Debug log
 
             # Calculate derived values
             if metadata['machine_settings']['voltage_kv'] != 0:
