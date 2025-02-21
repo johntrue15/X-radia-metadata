@@ -412,7 +412,7 @@ class EnhancedTXRMProcessor(object):
             'X-ray Tube: voltage': metadata['machine_settings']['voltage_kv'],
             'X-ray Tube: power (W)': metadata['machine_settings']['power_watts'],
             'Xray tube: current (uA)': (metadata['machine_settings']['power_watts'] / 
-                                      metadata['machine_settings']['voltage_kv'] * 100  # Changed to *100
+                                      metadata['machine_settings']['voltage_kv'] * 100  
                                       if metadata['machine_settings']['voltage_kv'] != 0 else 0),
             'X-ray: Filter': metadata['machine_settings']['filter'],
             'Detector: Binning': metadata['machine_settings']['binning'],
@@ -420,12 +420,12 @@ class EnhancedTXRMProcessor(object):
             'Detector: Averaging': metadata['projection_summary'].get('projection_count', ''),
             'Image width (pixels)': metadata['image_properties']['width_pixels'],
             'Image height (pixels)': metadata['image_properties']['height_pixels'],
-            'Image width real': metadata['image_properties']['width_real'],  # Changed to match exactly
-            'Image height real': metadata['image_properties']['height_real'],  # Changed to match exactly
+            'Image width real': metadata['image_properties']['width_real'],
+            'Image height real': metadata['image_properties']['height_real'],
             'Scan time': metadata['projection_summary'].get('scan_time', ''),
-            'Start time': metadata['projection_summary']['time_span']['start_date'].strftime('%Y-%m-%d %H:%M:%S')  # Swapped start/end
+            'Start time': metadata['projection_summary']['time_span']['start_date'].strftime('%Y-%m-%d %H:%M:%S') 
                          if metadata['projection_summary']['time_span']['start_date'] else '',
-            'End time': metadata['projection_summary']['time_span']['end_date'].strftime('%Y-%m-%d %H:%M:%S')  # Swapped start/end
+            'End time': metadata['projection_summary']['time_span']['end_date'].strftime('%Y-%m-%d %H:%M:%S') 
                        if metadata['projection_summary']['time_span']['end_date'] else '',
             'TXRM File path': metadata['file_info']['file_path'],
             'File path': metadata['file_info']['folder_path'],
@@ -448,9 +448,9 @@ class EnhancedTXRMProcessor(object):
             for suffix, column_suffix in [('start', 'start position'), 
                                         ('end', 'end position'), 
                                         ('range', 'range')]:
-                proj_key = f'proj_{orig_name}_{suffix}'
+                proj_key = 'proj_{}_{}'.format(orig_name, suffix)
                 if proj_key in metadata['projection_summary']:
-                    column_name = f'{column_prefix} {column_suffix}'
+                    column_name = '{} {}'.format(column_prefix, column_suffix)
                     flat_data[column_name] = metadata['projection_summary'][proj_key]
 
         return flat_data
