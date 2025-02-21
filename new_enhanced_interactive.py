@@ -524,8 +524,7 @@ class EnhancedTXRMProcessor(object):
                 if not order_correct:
                     print("Column order does not match expected order")
                     for i, (exp, got) in enumerate(zip(self.EXPECTED_COLUMNS, header)):
-                        if exp != got:
-                            print(f"Position {i}: Expected '{exp}', Got '{got}'")
+                        print("Position {}: Expected '{}', Got '{}'".format(i, exp, got))
                 
                 if not missing and not extra and order_correct:
                     print("✓ All columns present and in correct order")
@@ -533,7 +532,7 @@ class EnhancedTXRMProcessor(object):
                 return False
                 
         except Exception as e:
-            print(f"Error verifying columns: {str(e)}")
+            print("Error verifying columns: {}".format(str(e)))
             return False
 
     def save_to_csv(self, filename="metadata_summary.csv"):
