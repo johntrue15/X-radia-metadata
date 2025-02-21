@@ -264,6 +264,19 @@ class EnhancedTXRMProcessor(object):
 
                 self.logger.debug("First projection data: {}".format(first_proj))  # Debug log
 
+                # Convert start_date and end_date to datetime objects
+                start_date_str = first_proj['time_span']['start_date']
+                end_date_str = first_proj['time_span']['end_date']
+
+                # Assuming the date format is known, e.g., '%Y-%m-%d %H:%M:%S'
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d %H:%M:%S') if start_date_str else None
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d %H:%M:%S') if end_date_str else None
+
+                # Calculate scan time if both dates are valid
+                if start_date and end_date:
+                    scan_time = end_date - start_date
+                    first_proj['scan_time'] = str(scan_time)  # Store scan time as a string if needed
+
                 # Get axis positions
                 axes = self.dataset.GetAxesNames()
                 for axis in axes:
@@ -289,12 +302,6 @@ class EnhancedTXRMProcessor(object):
                 metadata['image_properties']['width_pixels'] * pixel_size)
             metadata['image_properties']['height_real'] = (
                 metadata['image_properties']['height_pixels'] * pixel_size)
-
-            # Calculate scan time if timestamps available
-            if 'projection_summary' in metadata:
-                start_time = metadata['projection_summary']['time_span']['start_date']
-                end_time = metadata['projection_summary']['time_span']['end_date']
-                metadata['projection_summary']['scan_time'] = self._calculate_scan_time(start_time, end_time)
 
             self.all_metadata.append(self._flatten_metadata(metadata))
             return metadata
