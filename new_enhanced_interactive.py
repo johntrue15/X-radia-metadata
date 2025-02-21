@@ -19,8 +19,8 @@ def check_admin():
             print("Please run PyCharm as administrator.\n")
             return False
         return True
-    except:
-        print("\nCouldn't verify admin privileges.")
+    except Exception as e:  # Catch specific exceptions
+        print("\nCouldn't verify admin privileges: {}".format(str(e)))
         return False
 
 class TXRMConfigConverter(object):
@@ -280,7 +280,7 @@ class EnhancedTXRMProcessor(object):
             # Calculate derived values
             if metadata['machine_settings']['voltage_kv'] != 0:
                 current_ua = (metadata['machine_settings']['power_watts'] / 
-                             metadata['machine_settings']['voltage_kv']) * 100 if voltage != 0 else 0
+                             metadata['machine_settings']['voltage_kv']) * 100 if metadata['machine_settings']['voltage_kv'] != 0 else 0
                 metadata['machine_settings']['current_ua'] = current_ua
 
             # Calculate real dimensions
