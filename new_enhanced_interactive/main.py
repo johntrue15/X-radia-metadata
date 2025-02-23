@@ -2,9 +2,12 @@
 from __future__ import print_function, division  # Add division for Python 2.7
 import os
 import ctypes
+
+# Standard library imports first
+from config.user_config import UserConfig
+# Then third-party imports
 from utils.file_utils import find_txrm_files, get_user_input
 from utils.progress_tracker import ProgressTracker
-from config.user_config import UserConfig
 from processors.txrm_processor import TXRMProcessor
 
 def check_admin():
@@ -18,7 +21,7 @@ def check_admin():
         print("\nCouldn't verify admin privileges: {0}".format(str(e)))
         return False
 
-def _handle_interactive_mode(file_path):
+def _handle_interactive_mode(_):  # Change file_path to _ since it's unused
     process_file = get_user_input(
         "Process this file? (y/n/q to quit): ",
         ['y', 'n', 'q']
@@ -27,9 +30,7 @@ def _handle_interactive_mode(file_path):
     if process_file == 'q':
         print("\nProcessing stopped by user.")
         return False
-    elif process_file == 'n':
-        return True
-    return True
+    return process_file == 'y'  # Simplified return logic
 
 def main():
     if not check_admin():

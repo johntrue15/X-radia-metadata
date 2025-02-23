@@ -4,9 +4,9 @@ import os
 import csv
 from datetime import datetime
 import gc
-from ..config.txrm_config_converter import TXRMConfigConverter
-from ..metadata.metadata_extractor import MetadataExtractor
-from ..utils.logging_utils import setup_logger
+from config.txrm_config_converter import TXRMConfigConverter
+from metadata.metadata_extractor import MetadataExtractor
+from utils.logging_utils import setup_logger
 
 class TXRMProcessor(object):
     def __init__(self, output_dir=None):
