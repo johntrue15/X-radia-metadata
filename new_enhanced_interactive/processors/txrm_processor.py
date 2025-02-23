@@ -21,7 +21,6 @@ class TXRMProcessor(object):
     def save_metadata_txt(self, metadata, file_path):
         """Save metadata as formatted text file next to TXRM file"""
         txt_path = os.path.splitext(file_path)[0] + "_metadata.txt"
-        success = False  # Initialize success flag
         try:
             with open(txt_path, 'w') as f:
                 # Write file info
@@ -71,13 +70,13 @@ class TXRMProcessor(object):
                             f.write("{0}: {1}\n".format(key, value))
             
             print("Metadata text file saved to: {0}".format(txt_path))
-            success = True
+            return True
+        
         except Exception as e:
             error_msg = "Error saving metadata text file: {0}".format(str(e))
             self.logger.error(error_msg)
             print(error_msg)
-        
-        return success
+            return False
 
     def save_cumulative_csv(self):
         """Save all collected metadata to a single CSV file"""
