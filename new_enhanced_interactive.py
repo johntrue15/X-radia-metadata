@@ -75,6 +75,15 @@ class TXRMConfigConverter(object):
         self.config.set('CT', 'Current', str(int(current)))
         self.config.set('CT', 'Filter', str(self.dataset.GetFilter()))
 
+    def save_config(self, output_path):
+        try:
+            with open(output_path, 'w') as configfile:
+                self.config.write(configfile)
+            return True
+        except Exception as e:
+            print("Error saving config file: {0}".format(str(e)))
+            return False
+
 class EnhancedTXRMProcessor(object):
     def __init__(self, output_dir=None):
         self.dataset = Data.XRMData.XrmBasicDataSet()
@@ -292,6 +301,10 @@ class EnhancedTXRMProcessor(object):
             metadata = self.get_complete_metadata(file_path)
             if not metadata:
                 return None
+            
+            # Save metadata to CSV
+            base_filename = os.path.splitext(os.path.basename(file_path))[0]
+            self.save_to_csv(metadata, base_filename)
             
             # Generate config file
             config_path = os.path.splitext(file_path)[0] + "_config.txt"
