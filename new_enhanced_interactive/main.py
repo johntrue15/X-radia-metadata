@@ -76,9 +76,13 @@ def main():
             prog_info['total']
         ))
     
+    # Save cumulative CSV
+    if processor.all_metadata:
+        processor.save_cumulative_csv()
+    
     print("\nProcessing complete!")
-    print("Check the 'metadata_output' folder for the CSV files.")
-    print("Check each .txrm location for config files.")
+    print("Check each .txrm location for metadata text and config files")
+    print("Check the 'metadata_output' folder for the cumulative CSV file.")
 
 if __name__ == "__main__":
     main() 
