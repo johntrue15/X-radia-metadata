@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 import os
-from utils.file_utils import get_user_input
+from new_enhanced_interactive.utils.file_utils import get_user_input
 
 class UserConfig(object):  # Explicitly inherit from object
     def __init__(self):

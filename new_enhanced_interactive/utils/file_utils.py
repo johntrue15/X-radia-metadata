@@ -16,8 +16,8 @@ def find_txrm_files(search_path, include_drift=False):
     print("\nSearching for .txrm files in: {0}".format(search_path))
     
     try:
-        for root, _, files in os.walk(search_path):
-            txrm_in_folder = [f for f in files if f.lower().endswith('.txrm')]
+        for root, _, filenames in os.walk(search_path):
+            txrm_in_folder = [f for f in filenames if f.lower().endswith('.txrm')]
             if txrm_in_folder:
                 if not include_drift:
                     txrm_in_folder = [f for f in txrm_in_folder if not is_drift_file(f)]
@@ -26,10 +26,10 @@ def find_txrm_files(search_path, include_drift=False):
                 folder_structure[rel_path] = len(txrm_in_folder)
                 total_files += len(txrm_in_folder)
                 
-                for file in txrm_in_folder:
-                    full_path = os.path.join(root, file)
+                for txrm_file in txrm_in_folder:
+                    full_path = os.path.join(root, txrm_file)
                     txrm_files.append(full_path)
-                    if is_drift_file(file):
+                    if is_drift_file(txrm_file):
                         drift_files += 1
                     print("Found: {0}".format(full_path))
 

@@ -3,20 +3,19 @@ from __future__ import print_function, division  # Add division for Python 2.7
 import os
 import ctypes
 
-# Standard library imports first
-from config.user_config import UserConfig
+# Use absolute imports
+from new_enhanced_interactive.config.user_config import UserConfig
 # Then third-party imports
-from utils.file_utils import find_txrm_files, get_user_input
-from utils.progress_tracker import ProgressTracker
-from processors.txrm_processor import TXRMProcessor
+from new_enhanced_interactive.utils.file_utils import find_txrm_files, get_user_input
+from new_enhanced_interactive.utils.progress_tracker import ProgressTracker
+from new_enhanced_interactive.processors.txrm_processor import TXRMProcessor
 
 def check_admin():
     """Cross-platform admin check"""
     try:
         if os.name == 'nt':  # Windows
             return ctypes.windll.shell32.IsUserAnAdmin()
-        else:  # Unix-based systems
-            return os.geteuid() == 0
+        return os.geteuid() == 0  # Remove unnecessary else
     except Exception as e:
         print("\nCouldn't verify admin privileges: {0}".format(str(e)))
         return False
