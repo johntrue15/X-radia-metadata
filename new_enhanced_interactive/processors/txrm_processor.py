@@ -79,62 +79,99 @@ class TXRMProcessor(object):
             return False
 
     def save_cumulative_csv(self):
-        """Save all collected metadata to a single CSV file"""
+        """Save all collected metadata to a single CSV file with specified column order"""
         if not self.all_metadata:
             return False
-            
+        
+        # Define column order and mappings
+        column_order = [
+            ('file_name', lambda m: os.path.splitext(os.path.basename(m.get('file_path', '')))[0]),
+            ('file_hyperlink', lambda m: m.get('file_path', '')),
+            ('ct_voxel_size_um', lambda m: str(m['machine_settings'].get('pixel_size', '')) if m['machine_settings'].get('pixel_size') is not None else ''),
+            ('ct_objective', lambda m: str(m['machine_settings'].get('objective', ''))),
+            ('ct_number_images', lambda m: str(m['image_properties'].get('total_projections', ''))),
+            ('ct_optical_magnification', lambda m: 'yes' if str(m['machine_settings'].get('objective', '')).lower() in ['4x', '20x', '40x'] else 'no'),
+            ('xray_tube_voltage', lambda m: str(m['machine_settings'].get('voltage', ''))),
+            ('xray_tube_power', lambda m: str(m['machine_settings'].get('power', ''))),
+            ('xray_tube_current', lambda m: self._calculate_xray_current(m)),
+            ('xray_filter', lambda m: str(m['machine_settings'].get('filter', ''))),
+            ('detector_binning', lambda m: str(m['machine_settings'].get('binning', ''))),
+            ('detector_capture_time', lambda m: str(m['projection_data'][0].get('exposure', '')) if m.get('projection_data') else ''),
+            ('detector_averaging', lambda m: str(len(m.get('projection_data', []))) if m.get('projection_data') else ''),
+            ('image_width_pixels', lambda m: str(m['image_properties'].get('width', ''))),
+            ('image_height_pixels', lambda m: str(m['image_properties'].get('height', ''))),
+            ('image_width_real', lambda m: self._calculate_real_dimension(m, 'width')),
+            ('image_height_real', lambda m: self._calculate_real_dimension(m, 'height')),
+            ('scan_time', lambda m: self._calculate_scan_time(m)),
+            ('start_time', lambda m: str(m['projection_data'][0].get('date', '')) if m.get('projection_data') else ''),
+            ('end_time', lambda m: str(m['projection_data'][-1].get('date', '')) if m.get('projection_data') else ''),
+            ('txrm_file_path', lambda m: m.get('file_path', '')),
+            ('file_path', lambda m: os.path.dirname(m.get('file_path', ''))),
+            ('acquisition_successful', lambda m: m['basic_info'].get('initialized_correctly', '')),
+        ]
+
+        # Add all axis-related columns
+        axes = ['Sample X', 'Sample Y', 'Sample Z', 'Sample Theta', 'Source X', 'Source Z', 
+                'Flat Panel Z', 'Flat Panel X', 'Detector Z', 'CCD Z', 'CCD X']
+        
+        for axis in axes:
+            safe_axis = axis.replace(' ', '_')
+            column_order.extend([
+                (f'{safe_axis.lower()}_start', lambda m, a=axis: self._get_axis_position(m, a, 0)),
+                (f'{safe_axis.lower()}_end', lambda m, a=axis: self._get_axis_position(m, a, -1)),
+                (f'{safe_axis.lower()}_range', lambda m, a=axis: self._calculate_axis_range(m, a))
+            ])
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         csv_path = os.path.join(self.output_dir, "cumulative_metadata_{0}.csv".format(timestamp))
         
         try:
-            # Prepare flattened data for CSV
-            flattened_data = []
+            # Prepare data with specified column order
+            rows = []
             for metadata in self.all_metadata:
                 row = {}
-                # Add file path
-                row['file_path'] = metadata.get('file_path', '')
+                for column_name, value_func in column_order:
+                    try:
+                        row[column_name] = value_func(metadata)
+                    except (KeyError, TypeError, ValueError) as e:
+                        self.logger.warning(f"Error getting value for {column_name}: {str(e)}")
+                        row[column_name] = ''
+                rows.append(row)
+
+            # Write to CSV with specified column order
+            with open(csv_path, 'wb') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=[col[0] for col in column_order])
+                writer.writeheader()
+                writer.writerows(rows)
                 
-                # Add basic info
-                for key, value in metadata['basic_info'].items():
-                    row['basic_' + key] = value
-                
-                # Add machine settings
-                for key, value in metadata['machine_settings'].items():
-                    row['machine_' + key] = value
-                
-                # Add image properties
-                for key, value in metadata['image_properties'].items():
-                    row['image_' + key] = value
-                
-                # Add first and last projection data
-                if metadata['projection_data']:
-                    first_proj = metadata['projection_data'][0]
-                    last_proj = metadata['projection_data'][-1]
-                    
-                    for key, value in first_proj.items():
-                        row['first_proj_' + key] = value
-                    
-                    for key, value in last_proj.items():
-                        row['last_proj_' + key] = value
-                
-                flattened_data.append(row)
+            print("\nCumulative metadata saved to: {0}".format(csv_path))
+            return True
             
-            # Write to CSV
-            if flattened_data:
-                fieldnames = flattened_data[0].keys()
-                with open(csv_path, 'wb') as csvfile:
-                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                    writer.writeheader()
-                    writer.writerows(flattened_data)
-                
-                print("\nCumulative metadata saved to: {0}".format(csv_path))
-                return True
-                
         except Exception as e:
             error_msg = "Error saving cumulative CSV: {0}".format(str(e))
             self.logger.error(error_msg)
             print(error_msg)
             return False
+
+    def _get_axis_position(self, metadata, axis, index):
+        """Helper method to get axis position from projection data"""
+        try:
+            if metadata['projection_data']:
+                return metadata['projection_data'][index].get(f'{axis.replace(" ", "_")}_pos', '')
+        except (KeyError, IndexError):
+            return ''
+        return ''
+
+    def _calculate_axis_range(self, metadata, axis):
+        """Helper method to calculate axis range"""
+        try:
+            if metadata['projection_data']:
+                start = float(metadata['projection_data'][0].get(f'{axis.replace(" ", "_")}_pos', 0))
+                end = float(metadata['projection_data'][-1].get(f'{axis.replace(" ", "_")}_pos', 0))
+                return abs(end - start)
+        except (KeyError, IndexError, ValueError):
+            return ''
+        return ''
 
     def process_single_file(self, file_path):
         try:
@@ -174,3 +211,112 @@ class TXRMProcessor(object):
             return False
         finally:
             gc.collect() 
+
+    def _calculate_xray_current(self, metadata):
+        """Safely calculate X-ray tube current"""
+        try:
+            power = float(metadata['machine_settings'].get('power', 0))
+            voltage = float(metadata['machine_settings'].get('voltage', 0))
+            if voltage > 0:
+                return str(round((power / voltage) * 100, 2))
+            return ''
+        except (ValueError, TypeError, ZeroDivisionError):
+            return '' 
+
+    def _calculate_real_dimension(self, metadata, dimension):
+        """Safely calculate real dimension"""
+        try:
+            pixels = float(metadata['image_properties'].get(dimension, 0))
+            pixel_size = float(metadata['machine_settings'].get('pixel_size', 0))
+            if pixels > 0 and pixel_size > 0:
+                return str(round(pixels * pixel_size, 2))
+            return ''
+        except (ValueError, TypeError):
+            return ''
+
+    def _calculate_scan_time(self, metadata):
+        """Safely calculate scan time"""
+        try:
+            if not metadata.get('projection_data'):
+                return ''
+            start_time = metadata['projection_data'][0].get('date')
+            end_time = metadata['projection_data'][-1].get('date')
+            if start_time and end_time:
+                time_diff = end_time - start_time
+                return str(time_diff)
+            return ''
+        except (IndexError, TypeError, ValueError):
+            return ''
+
+    def _calculate_real_dimension(self, metadata, dimension):
+        """Safely calculate real dimension"""
+        try:
+            pixels = float(metadata['image_properties'].get(dimension, 0))
+            pixel_size = float(metadata['machine_settings'].get('pixel_size', 0))
+            if pixels > 0 and pixel_size > 0:
+                return str(round(pixels * pixel_size, 2))
+            return ''
+        except (ValueError, TypeError):
+            return ''
+
+    def _calculate_scan_time(self, metadata):
+        """Safely calculate scan time"""
+        try:
+            if not metadata.get('projection_data'):
+                return ''
+            start_time = metadata['projection_data'][0].get('date')
+            end_time = metadata['projection_data'][-1].get('date')
+            if start_time and end_time:
+                time_diff = end_time - start_time
+                return str(time_diff)
+            return ''
+        except (IndexError, TypeError, ValueError):
+            return ''
+
+    def _get_axis_position(self, metadata, axis, index):
+        """Safely get axis position"""
+        try:
+            if metadata.get('projection_data'):
+                pos = metadata['projection_data'][index].get(f'{axis.replace(" ", "_")}_pos')
+                return str(pos) if pos is not None else ''
+            return ''
+        except (KeyError, IndexError):
+            return ''
+
+    def _calculate_axis_range(self, metadata, axis):
+        """Safely calculate axis range"""
+        try:
+            if not metadata.get('projection_data'):
+                return ''
+            start_pos = metadata['projection_data'][0].get(f'{axis.replace(" ", "_")}_pos')
+            end_pos = metadata['projection_data'][-1].get(f'{axis.replace(" ", "_")}_pos')
+            if start_pos is not None and end_pos is not None:
+                return str(round(abs(float(end_pos) - float(start_pos)), 2))
+            return ''
+        except (ValueError, TypeError, IndexError):
+            return ''
+
+    def _calculate_real_dimension(self, metadata, dimension):
+        """Safely calculate real dimension"""
+        try:
+            pixels = float(metadata['image_properties'].get(dimension, 0))
+            pixel_size = float(metadata['machine_settings'].get('pixel_size', 0))
+            if pixels > 0 and pixel_size > 0:
+                return str(round(pixels * pixel_size, 2))
+            return ''
+        except (ValueError, TypeError):
+            return ''
+
+    def _calculate_scan_time(self, metadata):
+        """Safely calculate scan time"""
+        try:
+            if not metadata.get('projection_data'):
+                return ''
+            start_time = metadata['projection_data'][0].get('date')
+            end_time = metadata['projection_data'][-1].get('date')
+            if start_time and end_time:
+                time_diff = end_time - start_time
+                return str(time_diff)
+            return ''
+        except (IndexError, TypeError, ValueError):
+            return '' 
