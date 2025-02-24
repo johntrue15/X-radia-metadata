@@ -1,167 +1,158 @@
-# ZEISS X-ray Microscopy Data Processing Tools
+# X-radia Metadata Extractor
 
-A collection of Python tools for processing and analyzing ZEISS X-ray microscopy files (.txrm/.xrm).
-
-## Tools Overview
-
-1. `MetadataExtractor.py` - Focused JSON output with summarized statistics
-2. `CompleteAPIMetadataExtractor.py` - Comprehensive CSV output with complete projection data
-3. `InteractiveTXRMProcessor.py` - Command-line interface for batch processing files
-4. `TXRMProcessorGUI.py` - Graphical interface for file selection and processing
-5. `TXRMConfigConverter.py` - Converts .txrm metadata to configuration file format
+A Python-based tool for extracting and processing metadata from X-radia TXRM files. This tool provides automated metadata extraction, configuration file generation, and continuous monitoring of TXRM files.
 
 ## Prerequisites
 
-- Python 2.7.14 (specific version required)
-- ZEISS Scout-and-Scan™ Control System installed
-- XradiaPy libraries (included with Scout-and-Scan™)
-- PyCharm Community Edition (recommended IDE)
+- Python 2.7 (required for XradiaPy compatibility)
+- PyCharm IDE (recommended)
+- Xradia Software Suite installed (for XradiaPy package)
+- Git (for version control)
 
 ## Installation
 
-1. Install PyCharm Community Edition
-2. Configure PyCharm to use Scout-and-Scan™ Python interpreter:
-   ```
-   Path: C:\Program Files\Carl Zeiss X-ray Microscopy\Xradia Versa\[version]\ScoutScan\pythonw.exe
-   ```
-
-## Tool Descriptions
-
-### MetadataExtractor.py
-- Creates single JSON file with metadata
-- Includes statistical summaries
-- Minimal disk space usage
-- Best for quick analysis
-
-### CompleteAPIMetadataExtractor.py
-- Creates multiple CSV files
-- Complete projection data
-- Maximum data extraction
-- Best for detailed analysis
-
-### InteractiveTXRMProcessor.py
-- Command-line interface
-- Batch processing capability
-- User control over file processing
-- Progress tracking
-
-### TXRMProcessorGUI.py
-- Graphical user interface
-- Drag-and-drop file selection
-- Progress bar and status updates
-- Real-time processing feedback
-
-### TXRMConfigConverter.py
-- Converts TXRM metadata to config format
-- Matches ZEISS configuration structure
-- Includes geometry and acquisition settings
-- Equipment-specific parameters
-
-## Usage Examples
-
-### JSON Metadata Extraction
-```python
-from MetadataExtractor import MetadataExtractor
-
-extractor = MetadataExtractor(output_dir="output")
-metadata = extractor.get_metadata("path/to/file.txrm")
-extractor.save_to_json(metadata, "path/to/file.txrm")
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/X-radia-metadata.git
+cd X-radia-metadata
 ```
 
-### CSV Full Data Extraction
-```python
-from CompleteAPIMetadataExtractor import CompleteAPIMetadataExtractor
+2. Set up in PyCharm:
+   - Open PyCharm
+   - File -> Open -> Select the `X-radia-metadata` directory
+   - Configure Python Interpreter:
+     - File -> Settings -> Project -> Python Interpreter
+     - Select Python 2.7 interpreter with XradiaPy package
 
-extractor = CompleteAPIMetadataExtractor(output_dir="output")
-data = extractor.get_complete_metadata("path/to/file.txrm")
-extractor.save_to_csv(data, "base_filename")
+## Project Structure
+
+```
+X-radia-metadata/
+├── new_enhanced_interactive/        # Main package
+│   ├── config/                      # Configuration handling
+│   ├── metadata/                    # Metadata extraction
+│   ├── processors/                  # TXRM processing
+│   ├── utils/                      # Utility functions
+│   └── tests/                      # Test files and mocks
+├── scripts/                        # Legacy standalone scripts
+└── main.py                         # Entry point
 ```
 
-### Config File Conversion
+## Configuration
+
+### GitHub Integration
+
+1. Create a Personal Access Token:
+   - Go to GitHub -> Settings -> Developer settings -> Personal access tokens
+   - Generate new token with 'repo' scope
+   - Copy the token
+
+2. Configure in `watch_config.py`:
 ```python
-from TXRMConfigConverter import TXRMConfigConverter
-
-converter = TXRMConfigConverter()
-converter.create_config_from_txrm("path/to/file.txrm")
-converter.save_config("output_config.txt")
-```
-
-## Output Formats
-
-### JSON Output Structure
-```json
-{
-    "file_info": {
-        "file_path": "...",
-        "file_name": "...",
-        "acquisition_complete": true/false
-    },
-    "machine_settings": {
-        "objective": "...",
-        "pixel_size_um": "...",
-        "power_watts": "...",
-        "voltage_kv": "..."
-    },
-    "projection_summary": {
-        "time_span": {...},
-        "exposure_times": {...},
-        "axis_ranges": {...}
-    }
+GITHUB_CONFIG = {
+    'token': 'your_github_token',
+    'repo_owner': 'your_github_username',
+    'repo_name': 'your_repo_name',
+    'branch': 'main'
 }
 ```
 
-### CSV Output Files
-1. `basic_info.csv` - File information
-2. `machine_settings.csv` - Equipment settings
-3. `image_properties.csv` - Resolution and dimensions
-4. `projections.csv` - Detailed projection data
+### Path Configuration
 
-### Config File Structure
-```ini
-[General]
-Version=2.8.2.20099
-SystemName=ZEISS XRM
-
-[Geometry]
-FDD=...
-FOD=...
-VoxelSizeX=...
-VoxelSizeY=...
-
-[CT]
-NumberImages=...
-RotationSector=...
-
-[Xray]
-Voltage=...
-Current=...
-Filter=...
+In `watch_config.py`, set up your watch directories:
+```python
+WATCH_CONFIG = {
+    'watch_paths': [
+        r'C:\Path\To\Your\TXRM\Files',
+        # Add more paths as needed
+    ],
+    'file_pattern': '*.txrm'
+}
 ```
 
-## Error Handling
+## Usage
 
-- All tools include comprehensive error logging
-- Errors are saved to log files in output directory
-- User-friendly error messages
-- Failed operations don't stop batch processing
+### Running in PyCharm
 
-## Known Limitations
+1. Open `main.py`
+2. Configure run configuration:
+   - Run -> Edit Configurations
+   - Add New Configuration -> Python
+   - Script path: Select `main.py`
+   - Python interpreter: Select Python 2.7
 
-1. Python 2.7.14 requirement
-2. Windows OS requirement
-3. Scout-and-Scan™ software dependency
-4. Large files may require significant processing time
-5. Memory usage scales with projection count
+3. Command-line options:
+```bash
+python main.py [options]
+  --watch          Enable continuous monitoring of directories
+  --path PATH      Process single directory
+  --file FILE      Process single file
+  --no-github      Disable GitHub integration
+```
+
+### Expected Outputs
+
+For each processed TXRM file, the following outputs are generated:
+
+1. Text Metadata File (`*_metadata.txt`):
+   - Located next to the source TXRM file
+   - Contains detailed metadata in human-readable format
+   - Includes basic info, machine settings, and image properties
+
+2. Configuration File (`*_config.txt`):
+   - Located next to the source TXRM file
+   - Contains machine configuration parameters
+
+3. Cumulative CSV File:
+   - Located in the output directory
+   - Combines metadata from all processed files
+   - Filename format: `cumulative_metadata_YYYYMMDD_HHMMSS.csv`
+   - Contains standardized columns for all metadata fields
+
+### Column Descriptions in CSV
+
+- `file_name`: Name of the TXRM file without extension
+- `ct_voxel_size_um`: Voxel size in micrometers
+- `ct_objective`: Objective lens used
+- `xray_tube_voltage`: X-ray tube voltage
+- `xray_tube_power`: X-ray tube power
+- `xray_tube_current`: Calculated current (power/voltage * 100)
+- (See code documentation for complete column list)
+
+## Troubleshooting
+
+1. XradiaPy Import Error:
+   - Ensure Xradia software is installed
+   - Verify Python 2.7 is being used
+   - Check PYTHONPATH includes Xradia installation directory
+
+2. Permission Issues:
+   - Run PyCharm as administrator
+   - Check file/directory permissions
+
+3. GitHub Integration Issues:
+   - Verify token permissions
+   - Check network connectivity
+   - Ensure correct repository configuration
+
+## Legacy Scripts
+
+The `scripts/` directory contains standalone versions of the metadata extractor:
+- `MetadataExtractor.py`: Basic metadata extraction
+- `InteractiveTXRMProcessor.py`: Interactive processing
+- `enhanced_interactive.py`: Enhanced interactive version
+- `CompleteAPIMetadataExtractor.py`: Complete API implementation
+
+These are maintained for reference but the main functionality has been integrated into the new package structure.
 
 ## Contributing
 
-When modifying these tools:
-1. Maintain Python 2.7 compatibility
-2. Test with various file sizes
-3. Update error handling
-4. Document API changes
-5. Test on workstation with ZEISS software
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
-These tools are provided for use with ZEISS X-ray microscopy systems. Usage and distribution should comply with ZEISS software licensing terms.
+[Your License Here]
