@@ -40,11 +40,11 @@ class TXRMFileWatcher(object):
         new_files = []
         try:
             for root, _, files in os.walk(self.config.config['watch_directory']):
-                for file in files:
-                    if file.lower().endswith('.txrm'):
-                        if not self.config.config['include_drift_files'] and 'drift' in file.lower():
+                for txrm_file in files:
+                    if txrm_file.lower().endswith('.txrm'):
+                        if not self.config.config['include_drift_files'] and 'drift' in txrm_file.lower():
                             continue
-                        full_path = os.path.join(root, file)
+                        full_path = os.path.join(root, txrm_file)
                         if full_path not in self.processed_files:
                             new_files.append(full_path)
         except Exception as e:
@@ -83,35 +83,52 @@ class TXRMFileWatcher(object):
         
         while True:
             try:
-                new_files = self._get_new_txrm_files()
-                if new_files:
-                    print("\nFound {0} new files at {1}".format(
-                        len(new_files), 
-                        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    ))
-                    
-                    for file_path in new_files:
-                        print("\nProcessing: {0}".format(file_path))
-                        if self.processor.process_single_file(file_path):
-                            self.processed_files.append(file_path)
-                            self._save_processed_files()
-                            
-                            # Save cumulative CSV and push to GitHub if enabled
-                            csv_path = self.processor.save_cumulative_csv()
-                            if csv_path and self.github_manager:
-                                commit_message = "Update metadata CSV - New file: {0}".format(
-                                    os.path.basename(file_path)
-                                )
-                                if self.github_manager.commit_and_push_csv(csv_path, commit_message):
-                                    print("Successfully pushed CSV to GitHub")
-                                else:
-                                    print("Failed to push CSV to GitHub")
-                
-                time.sleep(self.config.config['polling_interval'])
+                if not self._process_new_files():
+                    time.sleep(self.config.config['polling_interval'])
+                    continue
                 
             except KeyboardInterrupt:
                 print("\nStopping watch mode...")
                 break
             except Exception as e:
                 print("Error in watch loop: {0}".format(str(e)))
-                time.sleep(self.config.config['polling_interval']) 
+                time.sleep(self.config.config['polling_interval'])
+
+    def _process_new_files(self):
+        """Process any new files found in watch directory"""
+        new_files = self._get_new_txrm_files()
+        if not new_files:
+            return False
+        
+        print("\nFound {0} new files at {1}".format(
+            len(new_files), 
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
+        
+        for file_path in new_files:
+            self._process_single_file(file_path)
+        
+        return True
+
+    def _process_single_file(self, file_path):
+        """Process a single TXRM file"""
+        print("\nProcessing: {0}".format(file_path))
+        if not self.processor.process_single_file(file_path):
+            return
+        
+        self.processed_files.append(file_path)
+        self._save_processed_files()
+        
+        # Save cumulative CSV and push to GitHub if enabled
+        csv_path = self.processor.save_cumulative_csv()
+        if not csv_path or not self.github_manager:
+            return
+        
+        commit_message = "Update metadata CSV - New file: {0}".format(
+            os.path.basename(file_path)
+        )
+        
+        if self.github_manager.commit_and_push_csv(csv_path, commit_message):
+            print("Successfully pushed CSV to GitHub")
+        else:
+            print("Failed to push CSV to GitHub") 

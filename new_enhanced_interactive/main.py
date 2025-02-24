@@ -4,12 +4,10 @@ import os
 import ctypes
 
 # Use absolute imports
-from new_enhanced_interactive.config.user_config import UserConfig
 from new_enhanced_interactive.config.watch_config import WatchConfig
-from new_enhanced_interactive.utils.file_utils import find_txrm_files, get_user_input
-from new_enhanced_interactive.utils.progress_tracker import ProgressTracker
-from new_enhanced_interactive.processors.txrm_processor import TXRMProcessor
+from new_enhanced_interactive.utils.file_utils import get_user_input
 from new_enhanced_interactive.utils.file_watcher import TXRMFileWatcher
+from new_enhanced_interactive.processors.txrm_processor import TXRMProcessor
 
 def check_admin():
     """Cross-platform admin check"""

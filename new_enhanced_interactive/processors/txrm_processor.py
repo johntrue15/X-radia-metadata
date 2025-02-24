@@ -134,7 +134,7 @@ class TXRMProcessor(object):
                     try:
                         row[column_name] = value_func(metadata)
                     except (KeyError, TypeError, ValueError) as e:
-                        self.logger.warning(f"Error getting value for {column_name}: {str(e)}")
+                        self.logger.warning("Error getting value for {0}: {1}".format(column_name, str(e)))
                         row[column_name] = ''
                 rows.append(row)
 
