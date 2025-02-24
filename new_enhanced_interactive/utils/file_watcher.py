@@ -14,7 +14,7 @@ class TXRMFileWatcher(object):
         
         # Initialize GitHub manager if enabled
         self.github_manager = None
-        if self.config.config['github_enabled']:
+        if self.config.config.get('github_enabled', False):  # Use get() with default False
             self.github_manager = self._setup_github_manager()
     
     def _load_processed_files(self):
@@ -54,22 +54,30 @@ class TXRMFileWatcher(object):
     def _setup_github_manager(self):
         """Setup GitHub manager with PAT"""
         try:
+            # Only proceed if all required GitHub config is present
+            github_config = self.config.config.get('github_config', {})
+            required_fields = ['token', 'repo_owner', 'repo_name', 'branch']
+            
+            if not all(github_config.get(field) for field in required_fields):
+                print("Incomplete GitHub configuration, running without GitHub integration")
+                return None
+            
             manager = GitHubManager(
-                self.config.config['github_repo_path'],
-                self.config.config['github_branch']
+                github_config['repo_path'],
+                github_config['branch']
             )
             
-            # Load PAT
-            if os.path.exists('.github_pat'):
-                with open('.github_pat', 'r') as f:
-                    pat = f.read().strip()
-                manager.set_pat(pat)
+            # Set token from config
+            manager.set_pat(github_config['token'])
             
             # Setup repository
-            if manager.setup_repo(self.config.config['github_remote_url']):
+            if manager.setup_repo(github_config['remote_url']):
+                print("GitHub integration successfully configured")
                 return manager
+            
         except Exception as e:
             print("Error setting up GitHub integration: {0}".format(str(e)))
+            print("Continuing without GitHub integration")
         return None
     
     def watch(self):
@@ -119,16 +127,18 @@ class TXRMFileWatcher(object):
         self.processed_files.append(file_path)
         self._save_processed_files()
         
-        # Save cumulative CSV and push to GitHub if enabled
+        # Save cumulative CSV
         csv_path = self.processor.save_cumulative_csv()
-        if not csv_path or not self.github_manager:
+        if not csv_path:
             return
-        
-        commit_message = "Update metadata CSV - New file: {0}".format(
-            os.path.basename(file_path)
-        )
-        
-        if self.github_manager.commit_and_push_csv(csv_path, commit_message):
-            print("Successfully pushed CSV to GitHub")
-        else:
-            print("Failed to push CSV to GitHub") 
+            
+        # Only attempt GitHub push if manager is configured
+        if self.github_manager:
+            commit_message = "Update metadata CSV - New file: {0}".format(
+                os.path.basename(file_path)
+            )
+            
+            if self.github_manager.commit_and_push_csv(csv_path, commit_message):
+                print("Successfully pushed CSV to GitHub")
+            else:
+                print("Failed to push CSV to GitHub, continuing processing") 

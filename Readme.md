@@ -7,7 +7,7 @@ A Python-based tool for extracting and processing metadata from X-radia TXRM fil
 - Python 2.7 (required for XradiaPy compatibility)
 - PyCharm IDE (recommended)
 - Xradia Software Suite installed (for XradiaPy package)
-- Git (for version control)
+- Git (optional, only needed if using GitHub integration)
 
 ## Installation
 
@@ -40,7 +40,17 @@ X-radia-metadata/
 
 ## Configuration
 
-### GitHub Integration
+### Basic Configuration
+
+The tool can run without any additional configuration. By default, it will:
+- Process TXRM files in the specified directory
+- Generate metadata text files next to each TXRM file
+- Create a cumulative CSV in the output directory
+- Not use GitHub integration
+
+### Optional GitHub Integration
+
+GitHub integration is completely optional. If you want to automatically push metadata updates to a GitHub repository:
 
 1. Create a Personal Access Token:
    - Go to GitHub -> Settings -> Developer settings -> Personal access tokens
@@ -50,6 +60,7 @@ X-radia-metadata/
 2. Configure in `watch_config.py`:
 ```python
 GITHUB_CONFIG = {
+    'enabled': True,  # Set to False to disable GitHub integration
     'token': 'your_github_token',
     'repo_owner': 'your_github_username',
     'repo_name': 'your_repo_name',
@@ -72,23 +83,56 @@ WATCH_CONFIG = {
 
 ## Usage
 
-### Running in PyCharm
+### Basic Usage
+
+The simplest way to run the tool is through PyCharm:
 
 1. Open `main.py`
-2. Configure run configuration:
-   - Run -> Edit Configurations
-   - Add New Configuration -> Python
-   - Script path: Select `main.py`
-   - Python interpreter: Select Python 2.7
+2. Run the script (Shift+F10 or green play button)
+3. Follow the interactive prompts to:
+   - Select the directory containing TXRM files
+   - Choose processing mode (batch or interactive)
+   - Specify output location
 
-3. Command-line options:
+### Advanced Usage
+
+The tool supports various command-line options:
+
 ```bash
-python main.py [options]
-  --watch          Enable continuous monitoring of directories
-  --path PATH      Process single directory
-  --file FILE      Process single file
-  --no-github      Disable GitHub integration
+# Basic processing (no GitHub)
+python main.py --path /path/to/txrm/files
+
+# Watch mode without GitHub
+python main.py --watch --path /path/to/watch
+
+# Process with GitHub integration
+python main.py --path /path/to/txrm/files --github
+
+# Watch mode with GitHub
+python main.py --watch --path /path/to/watch --github
+
+# Process single file
+python main.py --file /path/to/single/file.txrm
+
+# Explicitly disable GitHub (same as not using --github)
+python main.py --path /path/to/txrm/files --no-github
 ```
+
+### Running Modes
+
+1. **Interactive Mode** (Default):
+   - Prompts for all settings
+   - Confirms each file before processing
+   - Shows real-time progress
+
+2. **Batch Mode**:
+   - Processes all files without confirmation
+   - Useful for large directories
+
+3. **Watch Mode**:
+   - Monitors directory for new files
+   - Automatically processes new files
+   - Optional GitHub integration
 
 ### Expected Outputs
 
@@ -130,10 +174,11 @@ For each processed TXRM file, the following outputs are generated:
    - Run PyCharm as administrator
    - Check file/directory permissions
 
-3. GitHub Integration Issues:
+3. GitHub Integration Issues (only if using GitHub):
    - Verify token permissions
    - Check network connectivity
    - Ensure correct repository configuration
+   - Try running without GitHub integration first
 
 ## Legacy Scripts
 
