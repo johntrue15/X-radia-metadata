@@ -10,7 +10,7 @@ import time
 from new_enhanced_interactive.config.txrm_config_converter import TXRMConfigConverter
 from new_enhanced_interactive.metadata.metadata_extractor import MetadataExtractor
 from new_enhanced_interactive.utils.logging_utils import setup_logger
-from new_enhanced_interactive.validators.txrm_validator import TXRMValidator
+from new_enhanced_interactive.utils.validation_utils import TXRMValidator
 
 class TXRMProcessor(object):
     def __init__(self, output_dir=None):
