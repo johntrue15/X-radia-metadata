@@ -78,6 +78,14 @@ class TXRMProcessor(object):
             print(error_msg)
             return False
 
+    def _get_file_name(self, m):
+        """Get file name without extension"""
+        return os.path.splitext(os.path.basename(m.get('file_path', '')))[0]
+
+    def _get_file_path(self, m):
+        """Get file path"""
+        return m.get('file_path', '')
+
     def save_cumulative_csv(self):
         """Save all collected metadata to a single CSV file with specified column order"""
         if not self.all_metadata:
@@ -85,15 +93,15 @@ class TXRMProcessor(object):
         
         # Define column order and mappings
         column_order = [
-            ('file_name', lambda m: os.path.splitext(os.path.basename(m.get('file_path', '')))[0]),
-            ('file_hyperlink', lambda m: m.get('file_path', '')),
+            ('file_name', self._get_file_name),
+            ('file_hyperlink', self._get_file_path),
             ('ct_voxel_size_um', lambda m: str(m['machine_settings'].get('pixel_size', '')) if m['machine_settings'].get('pixel_size') is not None else ''),
             ('ct_objective', lambda m: str(m['machine_settings'].get('objective', ''))),
             ('ct_number_images', lambda m: str(m['image_properties'].get('total_projections', ''))),
             ('ct_optical_magnification', lambda m: 'yes' if str(m['machine_settings'].get('objective', '')).lower() in ['4x', '20x', '40x'] else 'no'),
             ('xray_tube_voltage', lambda m: str(m['machine_settings'].get('voltage', ''))),
             ('xray_tube_power', lambda m: str(m['machine_settings'].get('power', ''))),
-            ('xray_tube_current', lambda m: self._calculate_xray_current(m)),
+            ('xray_tube_current', self._calculate_xray_current),
             ('xray_filter', lambda m: str(m['machine_settings'].get('filter', ''))),
             ('detector_binning', lambda m: str(m['machine_settings'].get('binning', ''))),
             ('detector_capture_time', lambda m: str(m['projection_data'][0].get('exposure', '')) if m.get('projection_data') else ''),
@@ -102,10 +110,10 @@ class TXRMProcessor(object):
             ('image_height_pixels', lambda m: str(m['image_properties'].get('height', ''))),
             ('image_width_real', lambda m: self._calculate_real_dimension(m, 'width')),
             ('image_height_real', lambda m: self._calculate_real_dimension(m, 'height')),
-            ('scan_time', lambda m: self._calculate_scan_time(m)),
+            ('scan_time', self._calculate_scan_time),
             ('start_time', lambda m: str(m['projection_data'][0].get('date', '')) if m.get('projection_data') else ''),
             ('end_time', lambda m: str(m['projection_data'][-1].get('date', '')) if m.get('projection_data') else ''),
-            ('txrm_file_path', lambda m: m.get('file_path', '')),
+            ('txrm_file_path', self._get_file_path),
             ('file_path', lambda m: os.path.dirname(m.get('file_path', ''))),
             ('acquisition_successful', lambda m: m['basic_info'].get('initialized_correctly', '')),
         ]
@@ -134,7 +142,7 @@ class TXRMProcessor(object):
                     try:
                         row[column_name] = value_func(metadata)
                     except (KeyError, TypeError, ValueError) as e:
-                        self.logger.warning("Error getting value for {0}: {1}".format(column_name, str(e)))
+                        self.logger.warning("Error getting value for %s: %s", column_name, str(e))
                         row[column_name] = ''
                 rows.append(row)
 
@@ -145,7 +153,7 @@ class TXRMProcessor(object):
                 writer.writerows(rows)
                 
             print("\nCumulative metadata saved to: {0}".format(csv_path))
-            return True
+            return csv_path
             
         except Exception as e:
             error_msg = "Error saving cumulative CSV: {0}".format(str(e))
