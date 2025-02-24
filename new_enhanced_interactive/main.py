@@ -5,10 +5,11 @@ import ctypes
 
 # Use absolute imports
 from new_enhanced_interactive.config.user_config import UserConfig
-# Then third-party imports
+from new_enhanced_interactive.config.watch_config import WatchConfig
 from new_enhanced_interactive.utils.file_utils import find_txrm_files, get_user_input
 from new_enhanced_interactive.utils.progress_tracker import ProgressTracker
 from new_enhanced_interactive.processors.txrm_processor import TXRMProcessor
+from new_enhanced_interactive.utils.file_watcher import TXRMFileWatcher
 
 def check_admin():
     """Cross-platform admin check"""
@@ -31,6 +32,50 @@ def _handle_interactive_mode(_):  # Change file_path to _ since it's unused
         return False
     return process_file == 'y'  # Simplified return logic
 
+def setup_watch_config():
+    """Setup or update watch configuration"""
+    config = WatchConfig()
+    
+    print("\nWatch Mode Configuration")
+    print("=" * 30)
+    
+    # Enable/disable watch mode
+    enable = get_user_input(
+        "Enable watch mode? (y/n): ",
+        ['y', 'n']
+    ) == 'y'
+    
+    if enable:
+        # Get watch directory
+        watch_dir = raw_input("\nEnter directory to watch for TXRM files: ").strip('"')
+        while not os.path.exists(watch_dir):
+            print("Directory does not exist!")
+            watch_dir = raw_input("Enter a valid directory: ").strip('"')
+        
+        # Get polling interval
+        interval = raw_input("\nEnter polling interval in seconds (default 60): ").strip()
+        interval = int(interval) if interval.isdigit() else 60
+        
+        # Include drift files
+        include_drift = get_user_input(
+            "\nInclude drift files? (y/n): ",
+            ['y', 'n']
+        ) == 'y'
+        
+        # Update config
+        config.update_config(
+            watch_mode_enabled=True,
+            watch_directory=watch_dir,
+            polling_interval=interval,
+            include_drift_files=include_drift,
+            cumulative_csv_path=os.path.join(watch_dir, "metadata_output")
+        )
+        print("\nWatch mode configuration saved!")
+    else:
+        config.update_config(watch_mode_enabled=False)
+    
+    return config
+
 def main():
     if not check_admin():
         user_input = get_user_input("Continue anyway? (y/n): ", ['y', 'n'])
@@ -38,51 +83,65 @@ def main():
             print("Exiting...")
             return
 
-    # Setup configuration
-    config = UserConfig()
-    config.setup_from_user_input()
+    # Load or setup watch configuration
+    config = WatchConfig()
     
-    # Initialize processor
-    processor = TXRMProcessor(
-        output_dir=os.path.join(config.output_dir, "metadata_output")
+    # Ask for mode
+    mode = get_user_input(
+        "\nSelect mode:\n1. Manual processing\n2. Watch mode\n3. Configure watch mode\nEnter (1/2/3): ",
+        ['1', '2', '3']
     )
     
-    # Find files
-    txrm_files = find_txrm_files(config.search_path, config.include_drift)
-    if not txrm_files:
-        print("\nNo .txrm files found in the specified path.")
+    if mode == '3':
+        config = setup_watch_config()
         return
     
-    # Initialize progress tracker
-    progress = ProgressTracker(len(txrm_files))
+    if mode == '2':
+        if not config.config['watch_mode_enabled']:
+            print("\nWatch mode is not configured! Please configure first.")
+            return
+        
+        # Initialize processor with watch directory output
+        processor = TXRMProcessor(output_dir=config.config['cumulative_csv_path'])
+        
+        # Start file watcher
+        watcher = TXRMFileWatcher(processor, config)
+        watcher.watch()
+        return
+    
+    # Manual mode
+    search_path = raw_input("\nEnter folder path containing TXRM files: ").strip('"')
+    while not os.path.exists(search_path):
+        print("Path does not exist!")
+        search_path = raw_input("Enter a valid folder path: ").strip('"')
+    
+    # Initialize processor
+    processor = TXRMProcessor(output_dir=os.path.join(search_path, "metadata_output"))
     
     # Process files
+    include_drift = get_user_input("\nInclude drift files? (y/n): ", ['y', 'n']) == 'y'
+    txrm_files = processor.find_txrm_files(search_path, include_drift)
+    
+    if not txrm_files:
+        print("\nNo TXRM files found in the specified path.")
+        return
+    
+    process_mode = get_user_input(
+        "\nChoose processing mode:\n1. Process all files (batch)\n2. Confirm each file\nEnter (1/2): ",
+        ['1', '2']
+    )
+    
     for i, file_path in enumerate(txrm_files, 1):
         print("\nFile {0} of {1}:".format(i, len(txrm_files)))
         print(file_path)
         
-        if config.process_mode == '2':
+        if process_mode == '2':
             if not _handle_interactive_mode(file_path):
                 break
         
-        success = processor.process_single_file(file_path)
-        progress.update(file_path, success)
-        
-        # Show progress
-        prog_info = progress.get_progress()
-        print("\nProgress: {0:.1f}% ({1}/{2} files)".format(
-            prog_info['percentage'],
-            prog_info['processed'],
-            prog_info['total']
-        ))
-    
-    # Save cumulative CSV
-    if processor.all_metadata:
-        processor.save_cumulative_csv()
+        processor.process_single_file(file_path)
     
     print("\nProcessing complete!")
-    print("Check each .txrm location for metadata text and config files")
-    print("Check the 'metadata_output' folder for the cumulative CSV file.")
 
 if __name__ == "__main__":
     main() 
