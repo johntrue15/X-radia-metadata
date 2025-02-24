@@ -4,11 +4,13 @@ import os
 import csv
 from datetime import datetime
 import gc
+import time
 
 # Use absolute imports
 from new_enhanced_interactive.config.txrm_config_converter import TXRMConfigConverter
 from new_enhanced_interactive.metadata.metadata_extractor import MetadataExtractor
 from new_enhanced_interactive.utils.logging_utils import setup_logger
+from new_enhanced_interactive.validators.txrm_validator import TXRMValidator
 
 class TXRMProcessor(object):
     def __init__(self, output_dir=None):
@@ -16,6 +18,7 @@ class TXRMProcessor(object):
         self.all_metadata = []  # Store metadata from all processed files
         self.config_converter = TXRMConfigConverter()
         self.metadata_extractor = MetadataExtractor()
+        self.validator = TXRMValidator()  # Add validator
         self.logger = setup_logger(self.output_dir)
 
     def save_metadata_txt(self, metadata, file_path):
@@ -26,6 +29,16 @@ class TXRMProcessor(object):
                 # Write file info
                 f.write("TXRM File Metadata\n")
                 f.write("=" * 50 + "\n\n")
+                
+                # File Hash
+                f.write("File Information:\n")
+                f.write("-" * 20 + "\n")
+                f.write("SHA-256 Hash: {0}\n".format(metadata['file_hash']))
+                f.write("File Size: {0} bytes\n".format(metadata['validation_info'].get('size', 'Unknown')))
+                f.write("Validated At: {0}\n\n".format(
+                    time.strftime('%Y-%m-%d %H:%M:%S', 
+                    time.localtime(metadata['validation_info'].get('validated_at', 0)))
+                ))
                 
                 # Basic Info
                 f.write("Basic Information:\n")
@@ -94,6 +107,10 @@ class TXRMProcessor(object):
         # Define column order and mappings
         column_order = [
             ('file_name', self._get_file_name),
+            ('file_hash', lambda m: m.get('file_hash', '')),  # Add hash to CSV
+            ('file_size_bytes', lambda m: str(m['validation_info'].get('size', ''))),
+            ('validation_timestamp', lambda m: time.strftime('%Y-%m-%d %H:%M:%S', 
+                time.localtime(m['validation_info'].get('validated_at', 0)))),
             ('file_hyperlink', self._get_file_path),
             ('ct_voxel_size_um', lambda m: str(m['machine_settings'].get('pixel_size', '')) if m['machine_settings'].get('pixel_size') is not None else ''),
             ('ct_objective', lambda m: str(m['machine_settings'].get('objective', ''))),
@@ -224,13 +241,26 @@ class TXRMProcessor(object):
         try:
             print("\nProcessing: {0}".format(file_path))
             
+            # Validate file and get hash
+            valid, message, file_hash = self.validator.validate_file(file_path)
+            if not valid:
+                error_msg = "File validation failed: {0}".format(message)
+                self.logger.error(error_msg)
+                print(error_msg)
+                return False
+                
+            # Log file hash
+            self.logger.info("File hash (SHA-256): %s", file_hash)
+            
             # Get metadata
             metadata = self.metadata_extractor.get_complete_metadata(file_path)
             if not metadata:
                 return False
                 
-            # Add file path to metadata
+            # Add file path and hash to metadata
             metadata['file_path'] = file_path
+            metadata['file_hash'] = file_hash
+            metadata['validation_info'] = self.validator.get_validation_info(file_path)
             
             # Save metadata as text file next to TXRM file
             if not self.save_metadata_txt(metadata, file_path):
