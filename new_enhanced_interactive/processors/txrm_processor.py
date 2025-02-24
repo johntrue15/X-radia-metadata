@@ -117,9 +117,9 @@ class TXRMProcessor(object):
         for axis in axes:
             safe_axis = axis.replace(' ', '_')
             column_order.extend([
-                (f'{safe_axis.lower()}_start', lambda m, a=axis: self._get_axis_position(m, a, 0)),
-                (f'{safe_axis.lower()}_end', lambda m, a=axis: self._get_axis_position(m, a, -1)),
-                (f'{safe_axis.lower()}_range', lambda m, a=axis: self._calculate_axis_range(m, a))
+                ('{0}_start'.format(safe_axis.lower()), lambda m, a=axis: self._get_axis_position(m, a, 0)),
+                ('{0}_end'.format(safe_axis.lower()), lambda m, a=axis: self._get_axis_position(m, a, -1)),
+                ('{0}_range'.format(safe_axis.lower()), lambda m, a=axis: self._calculate_axis_range(m, a))
             ])
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -153,25 +153,64 @@ class TXRMProcessor(object):
             print(error_msg)
             return False
 
-    def _get_axis_position(self, metadata, axis, index):
-        """Helper method to get axis position from projection data"""
+    def _calculate_xray_current(self, metadata):
+        """Safely calculate X-ray tube current"""
         try:
-            if metadata['projection_data']:
-                return metadata['projection_data'][index].get(f'{axis.replace(" ", "_")}_pos', '')
+            power = float(metadata['machine_settings'].get('power', 0))
+            voltage = float(metadata['machine_settings'].get('voltage', 0))
+            if voltage > 0:
+                return str(round((power / voltage) * 100, 2))
+            return ''
+        except (ValueError, TypeError, ZeroDivisionError):
+            return ''
+
+    def _calculate_real_dimension(self, metadata, dimension):
+        """Safely calculate real dimension"""
+        try:
+            pixels = float(metadata['image_properties'].get(dimension, 0))
+            pixel_size = float(metadata['machine_settings'].get('pixel_size', 0))
+            if pixels > 0 and pixel_size > 0:
+                return str(round(pixels * pixel_size, 2))
+            return ''
+        except (ValueError, TypeError):
+            return ''
+
+    def _calculate_scan_time(self, metadata):
+        """Safely calculate scan time"""
+        try:
+            if not metadata.get('projection_data'):
+                return ''
+            start_time = metadata['projection_data'][0].get('date')
+            end_time = metadata['projection_data'][-1].get('date')
+            if start_time and end_time:
+                time_diff = end_time - start_time
+                return str(time_diff)
+            return ''
+        except (IndexError, TypeError, ValueError):
+            return ''
+
+    def _get_axis_position(self, metadata, axis, index):
+        """Safely get axis position"""
+        try:
+            if metadata.get('projection_data'):
+                pos = metadata['projection_data'][index].get('{0}_pos'.format(axis.replace(" ", "_")))
+                return str(pos) if pos is not None else ''
+            return ''
         except (KeyError, IndexError):
             return ''
-        return ''
 
     def _calculate_axis_range(self, metadata, axis):
-        """Helper method to calculate axis range"""
+        """Safely calculate axis range"""
         try:
-            if metadata['projection_data']:
-                start = float(metadata['projection_data'][0].get(f'{axis.replace(" ", "_")}_pos', 0))
-                end = float(metadata['projection_data'][-1].get(f'{axis.replace(" ", "_")}_pos', 0))
-                return abs(end - start)
-        except (KeyError, IndexError, ValueError):
+            if not metadata.get('projection_data'):
+                return ''
+            start_pos = metadata['projection_data'][0].get('{0}_pos'.format(axis.replace(" ", "_")))
+            end_pos = metadata['projection_data'][-1].get('{0}_pos'.format(axis.replace(" ", "_")))
+            if start_pos is not None and end_pos is not None:
+                return str(round(abs(float(end_pos) - float(start_pos)), 2))
             return ''
-        return ''
+        except (ValueError, TypeError, IndexError):
+            return ''
 
     def process_single_file(self, file_path):
         try:
@@ -211,112 +250,3 @@ class TXRMProcessor(object):
             return False
         finally:
             gc.collect() 
-
-    def _calculate_xray_current(self, metadata):
-        """Safely calculate X-ray tube current"""
-        try:
-            power = float(metadata['machine_settings'].get('power', 0))
-            voltage = float(metadata['machine_settings'].get('voltage', 0))
-            if voltage > 0:
-                return str(round((power / voltage) * 100, 2))
-            return ''
-        except (ValueError, TypeError, ZeroDivisionError):
-            return '' 
-
-    def _calculate_real_dimension(self, metadata, dimension):
-        """Safely calculate real dimension"""
-        try:
-            pixels = float(metadata['image_properties'].get(dimension, 0))
-            pixel_size = float(metadata['machine_settings'].get('pixel_size', 0))
-            if pixels > 0 and pixel_size > 0:
-                return str(round(pixels * pixel_size, 2))
-            return ''
-        except (ValueError, TypeError):
-            return ''
-
-    def _calculate_scan_time(self, metadata):
-        """Safely calculate scan time"""
-        try:
-            if not metadata.get('projection_data'):
-                return ''
-            start_time = metadata['projection_data'][0].get('date')
-            end_time = metadata['projection_data'][-1].get('date')
-            if start_time and end_time:
-                time_diff = end_time - start_time
-                return str(time_diff)
-            return ''
-        except (IndexError, TypeError, ValueError):
-            return ''
-
-    def _calculate_real_dimension(self, metadata, dimension):
-        """Safely calculate real dimension"""
-        try:
-            pixels = float(metadata['image_properties'].get(dimension, 0))
-            pixel_size = float(metadata['machine_settings'].get('pixel_size', 0))
-            if pixels > 0 and pixel_size > 0:
-                return str(round(pixels * pixel_size, 2))
-            return ''
-        except (ValueError, TypeError):
-            return ''
-
-    def _calculate_scan_time(self, metadata):
-        """Safely calculate scan time"""
-        try:
-            if not metadata.get('projection_data'):
-                return ''
-            start_time = metadata['projection_data'][0].get('date')
-            end_time = metadata['projection_data'][-1].get('date')
-            if start_time and end_time:
-                time_diff = end_time - start_time
-                return str(time_diff)
-            return ''
-        except (IndexError, TypeError, ValueError):
-            return ''
-
-    def _get_axis_position(self, metadata, axis, index):
-        """Safely get axis position"""
-        try:
-            if metadata.get('projection_data'):
-                pos = metadata['projection_data'][index].get(f'{axis.replace(" ", "_")}_pos')
-                return str(pos) if pos is not None else ''
-            return ''
-        except (KeyError, IndexError):
-            return ''
-
-    def _calculate_axis_range(self, metadata, axis):
-        """Safely calculate axis range"""
-        try:
-            if not metadata.get('projection_data'):
-                return ''
-            start_pos = metadata['projection_data'][0].get(f'{axis.replace(" ", "_")}_pos')
-            end_pos = metadata['projection_data'][-1].get(f'{axis.replace(" ", "_")}_pos')
-            if start_pos is not None and end_pos is not None:
-                return str(round(abs(float(end_pos) - float(start_pos)), 2))
-            return ''
-        except (ValueError, TypeError, IndexError):
-            return ''
-
-    def _calculate_real_dimension(self, metadata, dimension):
-        """Safely calculate real dimension"""
-        try:
-            pixels = float(metadata['image_properties'].get(dimension, 0))
-            pixel_size = float(metadata['machine_settings'].get('pixel_size', 0))
-            if pixels > 0 and pixel_size > 0:
-                return str(round(pixels * pixel_size, 2))
-            return ''
-        except (ValueError, TypeError):
-            return ''
-
-    def _calculate_scan_time(self, metadata):
-        """Safely calculate scan time"""
-        try:
-            if not metadata.get('projection_data'):
-                return ''
-            start_time = metadata['projection_data'][0].get('date')
-            end_time = metadata['projection_data'][-1].get('date')
-            if start_time and end_time:
-                time_diff = end_time - start_time
-                return str(time_diff)
-            return ''
-        except (IndexError, TypeError, ValueError):
-            return '' 
