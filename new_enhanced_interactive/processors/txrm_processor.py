@@ -102,53 +102,75 @@ class TXRMProcessor(object):
     def save_cumulative_csv(self):
         """Save all collected metadata to a single CSV file with specified column order"""
         if not self.all_metadata:
+            self.logger.warning("No metadata to save to cumulative CSV")
             return False
         
-        # Define column order and mappings
+        # Define column order and mappings with clear descriptions
         column_order = [
+            # File Information
             ('file_name', self._get_file_name),
-            ('file_hash', lambda m: m.get('file_hash', '')),  # Add hash to CSV
+            ('file_hash', lambda m: m.get('file_hash', '')),
             ('file_size_bytes', lambda m: str(m['validation_info'].get('size', ''))),
             ('validation_timestamp', lambda m: time.strftime('%Y-%m-%d %H:%M:%S', 
                 time.localtime(m['validation_info'].get('validated_at', 0)))),
-            ('file_hyperlink', self._get_file_path),
-            ('ct_voxel_size_um', lambda m: str(m['machine_settings'].get('pixel_size', '')) if m['machine_settings'].get('pixel_size') is not None else ''),
+            ('file_path', lambda m: os.path.dirname(m.get('file_path', ''))),
+            ('txrm_file_path', self._get_file_path),
+            ('acquisition_successful', lambda m: str(m['basic_info'].get('initialized_correctly', 'False'))),
+            
+            # Machine Settings
+            ('ct_voxel_size_um', lambda m: str(m['machine_settings'].get('pixel_size', '0.0'))),
             ('ct_objective', lambda m: str(m['machine_settings'].get('objective', ''))),
-            ('ct_number_images', lambda m: str(m['image_properties'].get('total_projections', ''))),
+            ('ct_number_images', lambda m: str(m['image_properties'].get('total_projections', '0'))),
             ('ct_optical_magnification', lambda m: 'yes' if str(m['machine_settings'].get('objective', '')).lower() in ['4x', '20x', '40x'] else 'no'),
-            ('xray_tube_voltage', lambda m: str(m['machine_settings'].get('voltage', ''))),
-            ('xray_tube_power', lambda m: str(m['machine_settings'].get('power', ''))),
+            ('xray_tube_voltage', lambda m: str(m['machine_settings'].get('voltage', '0.0'))),
+            ('xray_tube_power', lambda m: str(m['machine_settings'].get('power', '0.0'))),
             ('xray_tube_current', self._calculate_xray_current),
             ('xray_filter', lambda m: str(m['machine_settings'].get('filter', ''))),
-            ('detector_binning', lambda m: str(m['machine_settings'].get('binning', ''))),
-            ('detector_capture_time', lambda m: str(m['projection_data'][0].get('exposure', '')) if m.get('projection_data') else ''),
-            ('detector_averaging', lambda m: str(len(m.get('projection_data', []))) if m.get('projection_data') else ''),
-            ('image_width_pixels', lambda m: str(m['image_properties'].get('width', ''))),
-            ('image_height_pixels', lambda m: str(m['image_properties'].get('height', ''))),
+            
+            # Detector Settings
+            ('detector_binning', lambda m: str(m['machine_settings'].get('binning', '0'))),
+            ('detector_capture_time', lambda m: str(m['projection_data'][0].get('exposure', '0.0')) if m.get('projection_data') else '0.0'),
+            ('detector_averaging', lambda m: str(len(m.get('projection_data', []))) if m.get('projection_data') else '0'),
+            
+            # Image Properties
+            ('image_width_pixels', lambda m: str(m['image_properties'].get('width', '0'))),
+            ('image_height_pixels', lambda m: str(m['image_properties'].get('height', '0'))),
             ('image_width_real', lambda m: self._calculate_real_dimension(m, 'width')),
             ('image_height_real', lambda m: self._calculate_real_dimension(m, 'height')),
+            
+            # Time Information
             ('scan_time', self._calculate_scan_time),
             ('start_time', lambda m: str(m['projection_data'][0].get('date', '')) if m.get('projection_data') else ''),
-            ('end_time', lambda m: str(m['projection_data'][-1].get('date', '')) if m.get('projection_data') else ''),
-            ('txrm_file_path', self._get_file_path),
-            ('file_path', lambda m: os.path.dirname(m.get('file_path', ''))),
-            ('acquisition_successful', lambda m: m['basic_info'].get('initialized_correctly', '')),
+            ('end_time', lambda m: str(m['projection_data'][-1].get('date', '')) if m.get('projection_data') else '')
         ]
 
-        # Add all axis-related columns
-        axes = ['Sample X', 'Sample Y', 'Sample Z', 'Sample Theta', 'Source X', 'Source Z', 
-                'Flat Panel Z', 'Flat Panel X', 'Detector Z', 'CCD Z', 'CCD X']
+        # Add all axis-related columns with proper formatting
+        axes = [
+            ('Sample X', 'Sample_X_pos'),
+            ('Sample Y', 'Sample_Y_pos'),
+            ('Sample Z', 'Sample_Z_pos'),
+            ('Sample Theta', 'Sample_Theta_pos'),
+            ('Source X', 'Source_X_pos'),
+            ('Source Z', 'Source_Z_pos'),
+            ('Flat Panel Z', 'Flat_Panel_Z_pos'),
+            ('Flat Panel X', 'Flat_Panel_X_pos'),
+            ('Detector Z', 'Detector_Z_pos'),
+            ('CCD Z', 'CCD_Z_pos'),
+            ('CCD X', 'CCD_X_pos'),
+            ('MkIV Filter Wheel', 'MkIV_Filter_Wheel_pos'),
+            ('DCT', 'DCT_pos')
+        ]
         
-        for axis in axes:
-            safe_axis = axis.replace(' ', '_')
+        for display_name, metadata_name in axes:
+            safe_name = display_name.lower().replace(' ', '_')
             column_order.extend([
-                ('{0}_start'.format(safe_axis.lower()), lambda m, a=axis: self._get_axis_position(m, a, 0)),
-                ('{0}_end'.format(safe_axis.lower()), lambda m, a=axis: self._get_axis_position(m, a, -1)),
-                ('{0}_range'.format(safe_axis.lower()), lambda m, a=axis: self._calculate_axis_range(m, a))
+                (f'{safe_name}_start', lambda m, name=metadata_name: self._get_axis_position(m, name, 0)),
+                (f'{safe_name}_end', lambda m, name=metadata_name: self._get_axis_position(m, name, -1)),
+                (f'{safe_name}_range', lambda m, name=metadata_name: self._calculate_axis_range_new(m, name))
             ])
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        csv_path = os.path.join(self.output_dir, "cumulative_metadata_{0}.csv".format(timestamp))
+        csv_path = os.path.join(self.output_dir, f"cumulative_metadata_{timestamp}.csv")
         
         try:
             # Prepare data with specified column order
@@ -157,24 +179,33 @@ class TXRMProcessor(object):
                 row = {}
                 for column_name, value_func in column_order:
                     try:
-                        row[column_name] = value_func(metadata)
-                    except (KeyError, TypeError, ValueError) as e:
-                        self.logger.warning("Error getting value for %s: %s", column_name, str(e))
+                        value = value_func(metadata)
+                        # Ensure numeric values are properly formatted
+                        if isinstance(value, float):
+                            row[column_name] = f"{value:.6f}"
+                        else:
+                            row[column_name] = str(value) if value is not None else ''
+                    except Exception as e:
+                        self.logger.warning(f"Error getting value for {column_name}: {str(e)}")
                         row[column_name] = ''
                 rows.append(row)
 
             # Write to CSV with specified column order
-            with open(csv_path, 'wb') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=[col[0] for col in column_order])
+            fieldnames = [col[0] for col in column_order]
+            
+            with open(csv_path, 'w') as csvfile:  # Changed from 'wb' to 'w' for better compatibility
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
-                writer.writerows(rows)
+                for row in rows:
+                    writer.writerow(row)
                 
-            print("\nCumulative metadata saved to: {0}".format(csv_path))
+            self.logger.info(f"Cumulative metadata saved to: {csv_path}")
+            print(f"\nCumulative metadata saved to: {csv_path}")
             return csv_path
             
         except Exception as e:
-            error_msg = "Error saving cumulative CSV: {0}".format(str(e))
-            self.logger.error(error_msg)
+            error_msg = f"Error saving cumulative CSV: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
             print(error_msg)
             return False
 
@@ -214,28 +245,30 @@ class TXRMProcessor(object):
         except (IndexError, TypeError, ValueError):
             return ''
 
-    def _get_axis_position(self, metadata, axis, index):
-        """Safely get axis position"""
+    def _get_axis_position(self, metadata, axis_name, index):
+        """Get axis position with improved precision"""
         try:
             if metadata.get('projection_data'):
-                pos = metadata['projection_data'][index].get('{0}_pos'.format(axis.replace(" ", "_")))
-                return str(pos) if pos is not None else ''
-            return ''
-        except (KeyError, IndexError):
-            return ''
+                pos = metadata['projection_data'][index].get(axis_name)
+                if pos is not None:
+                    return f"{float(pos):.6f}"
+            return '0.0'
+        except (KeyError, IndexError, ValueError) as e:
+            self.logger.debug(f"Error getting position for {axis_name}: {str(e)}")
+            return '0.0'
 
-    def _calculate_axis_range(self, metadata, axis):
-        """Safely calculate axis range"""
+    def _calculate_axis_range_new(self, metadata, axis_name):
+        """Calculate axis range with improved precision"""
         try:
             if not metadata.get('projection_data'):
-                return ''
-            start_pos = metadata['projection_data'][0].get('{0}_pos'.format(axis.replace(" ", "_")))
-            end_pos = metadata['projection_data'][-1].get('{0}_pos'.format(axis.replace(" ", "_")))
-            if start_pos is not None and end_pos is not None:
-                return str(round(abs(float(end_pos) - float(start_pos)), 2))
-            return ''
-        except (ValueError, TypeError, IndexError):
-            return ''
+                return '0.0'
+            start_pos = float(metadata['projection_data'][0].get(axis_name, 0))
+            end_pos = float(metadata['projection_data'][-1].get(axis_name, 0))
+            range_value = abs(end_pos - start_pos)
+            return f"{range_value:.6f}"
+        except (ValueError, TypeError, IndexError) as e:
+            self.logger.debug(f"Error calculating range for {axis_name}: {str(e)}")
+            return '0.0'
 
     def process_single_file(self, file_path):
         try:
