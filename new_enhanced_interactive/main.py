@@ -2,6 +2,14 @@
 from __future__ import print_function, division  # Add division for Python 2.7
 import os
 import ctypes
+import sys
+
+# Fix module import path if running script directly
+if __name__ == "__main__":
+    # Add parent directory to path so package imports work properly
+    module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    if module_path not in sys.path:
+        sys.path.insert(0, module_path)
 
 # Use absolute imports
 from new_enhanced_interactive.config.watch_config import WatchConfig
