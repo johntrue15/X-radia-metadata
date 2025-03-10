@@ -18,8 +18,8 @@ class TXRMProcessor(object):
         self.all_metadata = []  # Store metadata from all processed files
         self.config_converter = TXRMConfigConverter()
         self.metadata_extractor = MetadataExtractor()
-        self.validator = TXRMValidator()  # Add validator
-        self.logger = setup_logger(self.output_dir)
+        self.validator = TXRMValidator()
+        self.logger = setup_logger('txrm_processor')
 
     def save_metadata_txt(self, metadata, file_path):
         """Save metadata as formatted text file next to TXRM file"""
@@ -33,32 +33,31 @@ class TXRMProcessor(object):
                 # File Hash
                 f.write("File Information:\n")
                 f.write("-" * 20 + "\n")
-                f.write("SHA-256 Hash: {0}\n".format(metadata['file_hash']))
-                f.write("File Size: {0} bytes\n".format(metadata['validation_info'].get('size', 'Unknown')))
-                f.write("Validated At: {0}\n\n".format(
+                f.write("SHA-256 Hash: %s\n" % metadata['file_hash'])
+                f.write("File Size: %s bytes\n" % metadata['validation_info'].get('size', 'Unknown'))
+                f.write("Validated At: %s\n\n" %
                     time.strftime('%Y-%m-%d %H:%M:%S', 
-                    time.localtime(metadata['validation_info'].get('validated_at', 0)))
-                ))
+                    time.localtime(metadata['validation_info'].get('validated_at', 0))))
                 
                 # Basic Info
                 f.write("Basic Information:\n")
                 f.write("-" * 20 + "\n")
                 for key, value in metadata['basic_info'].items():
-                    f.write("{0}: {1}\n".format(key, value))
+                    f.write("%s: %s\n" % (key, value))
                 f.write("\n")
                 
                 # Machine Settings
                 f.write("Machine Settings:\n")
                 f.write("-" * 20 + "\n")
                 for key, value in metadata['machine_settings'].items():
-                    f.write("{0}: {1}\n".format(key, value))
+                    f.write("%s: %s\n" % (key, value))
                 f.write("\n")
                 
                 # Image Properties
                 f.write("Image Properties:\n")
                 f.write("-" * 20 + "\n")
                 for key, value in metadata['image_properties'].items():
-                    f.write("{0}: {1}\n".format(key, value))
+                    f.write("%s: %s\n" % (key, value))
                 f.write("\n")
                 
                 # Projection Data Summary
@@ -67,26 +66,26 @@ class TXRMProcessor(object):
                 if metadata['projection_data']:
                     first_proj = metadata['projection_data'][0]
                     last_proj = metadata['projection_data'][-1]
-                    f.write("Total Projections: {0}\n".format(len(metadata['projection_data'])))
-                    f.write("First Projection Date: {0}\n".format(first_proj['date']))
-                    f.write("Last Projection Date: {0}\n".format(last_proj['date']))
+                    f.write("Total Projections: %s\n" % len(metadata['projection_data']))
+                    f.write("First Projection Date: %s\n" % first_proj['date'])
+                    f.write("Last Projection Date: %s\n" % last_proj['date'])
                     
                     # Write axis positions for first and last projections
                     f.write("\nFirst Projection Axis Positions:\n")
                     for key, value in first_proj.items():
                         if '_pos' in key:
-                            f.write("{0}: {1}\n".format(key, value))
+                            f.write("%s: %s\n" % (key, value))
                             
                     f.write("\nLast Projection Axis Positions:\n")
                     for key, value in last_proj.items():
                         if '_pos' in key:
-                            f.write("{0}: {1}\n".format(key, value))
+                            f.write("%s: %s\n" % (key, value))
             
-            print("Metadata text file saved to: {0}".format(txt_path))
+            self.logger.info("Metadata text file saved to: %s", txt_path)
             return True
         
         except Exception as e:
-            error_msg = "Error saving metadata text file: {0}".format(str(e))
+            error_msg = "Error saving metadata text file: %s" % str(e)
             self.logger.error(error_msg)
             print(error_msg)
             return False
@@ -164,13 +163,13 @@ class TXRMProcessor(object):
         for display_name, metadata_name in axes:
             safe_name = display_name.lower().replace(' ', '_')
             column_order.extend([
-                (f'{safe_name}_start', lambda m, name=metadata_name: self._get_axis_position(m, name, 0)),
-                (f'{safe_name}_end', lambda m, name=metadata_name: self._get_axis_position(m, name, -1)),
-                (f'{safe_name}_range', lambda m, name=metadata_name: self._calculate_axis_range_new(m, name))
+                ('{0}_start'.format(safe_name), lambda m, name=metadata_name: self._get_axis_position(m, name, 0)),
+                ('{0}_end'.format(safe_name), lambda m, name=metadata_name: self._get_axis_position(m, name, -1)),
+                ('{0}_range'.format(safe_name), lambda m, name=metadata_name: self._calculate_axis_range_new(m, name))
             ])
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        csv_path = os.path.join(self.output_dir, f"cumulative_metadata_{timestamp}.csv")
+        csv_path = os.path.join(self.output_dir, "cumulative_metadata_{0}.csv".format(timestamp))
         
         try:
             # Prepare data with specified column order
@@ -182,11 +181,11 @@ class TXRMProcessor(object):
                         value = value_func(metadata)
                         # Ensure numeric values are properly formatted
                         if isinstance(value, float):
-                            row[column_name] = f"{value:.6f}"
+                            row[column_name] = "{0:.6f}".format(value)
                         else:
                             row[column_name] = str(value) if value is not None else ''
                     except Exception as e:
-                        self.logger.warning(f"Error getting value for {column_name}: {str(e)}")
+                        self.logger.warning("Error getting value for %s: %s", column_name, str(e))
                         row[column_name] = ''
                 rows.append(row)
 
@@ -199,12 +198,12 @@ class TXRMProcessor(object):
                 for row in rows:
                     writer.writerow(row)
                 
-            self.logger.info(f"Cumulative metadata saved to: {csv_path}")
-            print(f"\nCumulative metadata saved to: {csv_path}")
+            self.logger.info("Cumulative metadata saved to: %s", csv_path)
+            print("\nCumulative metadata saved to: %s", csv_path)
             return csv_path
             
         except Exception as e:
-            error_msg = f"Error saving cumulative CSV: {str(e)}"
+            error_msg = "Error saving cumulative CSV: %s" % str(e)
             self.logger.error(error_msg, exc_info=True)
             print(error_msg)
             return False
@@ -251,10 +250,10 @@ class TXRMProcessor(object):
             if metadata.get('projection_data'):
                 pos = metadata['projection_data'][index].get(axis_name)
                 if pos is not None:
-                    return f"{float(pos):.6f}"
+                    return "{0:.6f}".format(float(pos))
             return '0.0'
         except (KeyError, IndexError, ValueError) as e:
-            self.logger.debug(f"Error getting position for {axis_name}: {str(e)}")
+            self.logger.debug("Error getting position for %s: %s", axis_name, str(e))
             return '0.0'
 
     def _calculate_axis_range_new(self, metadata, axis_name):
@@ -265,19 +264,19 @@ class TXRMProcessor(object):
             start_pos = float(metadata['projection_data'][0].get(axis_name, 0))
             end_pos = float(metadata['projection_data'][-1].get(axis_name, 0))
             range_value = abs(end_pos - start_pos)
-            return f"{range_value:.6f}"
+            return "{0:.6f}".format(range_value)
         except (ValueError, TypeError, IndexError) as e:
-            self.logger.debug(f"Error calculating range for {axis_name}: {str(e)}")
+            self.logger.debug("Error calculating range for %s: %s", axis_name, str(e))
             return '0.0'
 
     def process_single_file(self, file_path):
         try:
-            print("\nProcessing: {0}".format(file_path))
+            print("\nProcessing: %s", file_path)
             
             # Validate file and get hash
             valid, message, file_hash = self.validator.validate_file(file_path)
             if not valid:
-                error_msg = "File validation failed: {0}".format(message)
+                error_msg = "File validation failed: %s" % message
                 self.logger.error(error_msg)
                 print(error_msg)
                 return False
@@ -306,7 +305,7 @@ class TXRMProcessor(object):
             config_path = os.path.splitext(file_path)[0] + "_config.txt"
             if self.config_converter.create_config_from_txrm(file_path, metadata=metadata):
                 if self.config_converter.save_config(config_path):
-                    self.logger.info(f"Configuration saved to: {config_path}")
+                    self.logger.info("Configuration saved to: %s", config_path)
                 else:
                     self.logger.error("Failed to save configuration file")
             else:
@@ -315,7 +314,7 @@ class TXRMProcessor(object):
             return True
             
         except Exception as e:
-            error_msg = "Error processing file {0}: {1}".format(file_path, str(e))
+            error_msg = "Error processing file %s: %s" % (file_path, str(e))
             self.logger.error(error_msg)
             print(error_msg)
             return False

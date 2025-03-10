@@ -11,7 +11,7 @@ if __name__ == "__main__":
     if module_path not in sys.path:
         sys.path.insert(0, module_path)
 
-# Use absolute imports
+# Import all required modules at the top level
 from new_enhanced_interactive.config.watch_config import WatchConfig
 from new_enhanced_interactive.utils.file_utils import get_user_input, find_txrm_files
 from new_enhanced_interactive.utils.file_watcher import TXRMFileWatcher

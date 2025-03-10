@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 import ConfigParser
+import os
 from XradiaPy import Data
-from utils.logger import setup_logger
+from new_enhanced_interactive.utils.logger import setup_logger
 
 class TXRMConfigConverter(object):
     def __init__(self):
@@ -67,12 +68,12 @@ class TXRMConfigConverter(object):
                         value = first_proj[metadata_name]
                         if value is not None:
                             self.config.set('Axis', config_name, str(value))
-                            self.logger.info(f"Set axis {config_name} to {value}")
+                            self.logger.info("Set axis {0} to {1}".format(config_name, value))
                         else:
-                            self.logger.warning(f"Axis {metadata_name} value is None")
+                            self.logger.warning("Axis {0} value is None".format(metadata_name))
                             self.config.set('Axis', config_name, '0.0')
                     else:
-                        self.logger.warning(f"Axis {metadata_name} not found in metadata")
+                        self.logger.warning("Axis {0} not found in metadata".format(metadata_name))
                         self.config.set('Axis', config_name, '0.0')
             else:
                 self.logger.error("No projection data found in metadata")
@@ -83,10 +84,10 @@ class TXRMConfigConverter(object):
                     if dataset_name in positions:
                         self.config.set('Axis', config_name, str(positions[dataset_name]))
                     else:
-                        self.logger.warning(f"Axis {dataset_name} not found in dataset")
+                        self.logger.warning("Axis {0} not found in dataset".format(dataset_name))
                         self.config.set('Axis', config_name, '0.0')
         except Exception as e:
-            self.logger.error(f"Error setting axis positions: {str(e)}", exc_info=True)
+            self.logger.error("Error setting axis positions: {0}".format(str(e)), exc_info=True)
             # Fallback to setting all axes to 0.0 if there's an error
             for config_name in axis_mapping:
                 self.config.set('Axis', config_name, '0.0')
@@ -109,7 +110,7 @@ class TXRMConfigConverter(object):
             self._fill_general_section()
             return True
         except Exception as e:
-            self.logger.error(f"Error processing TXRM file: {str(e)}", exc_info=True)
+            self.logger.error("Error processing TXRM file: {0}".format(str(e)), exc_info=True)
             return False
 
     def save_config(self, output_path):
@@ -118,7 +119,7 @@ class TXRMConfigConverter(object):
                 self.config.write(configfile)
             return True
         except Exception as e:
-            print("Error saving config file: {0}".format(str(e)))
+            self.logger.error("Error saving config file: {0}".format(str(e)))
             return False
 
     # ... (rest of the config converter methods) 
