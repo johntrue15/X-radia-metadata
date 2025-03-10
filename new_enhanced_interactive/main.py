@@ -13,7 +13,7 @@ if __name__ == "__main__":
 
 # Use absolute imports
 from new_enhanced_interactive.config.watch_config import WatchConfig
-from new_enhanced_interactive.utils.file_utils import get_user_input
+from new_enhanced_interactive.utils.file_utils import get_user_input, find_txrm_files
 from new_enhanced_interactive.utils.file_watcher import TXRMFileWatcher
 from new_enhanced_interactive.processors.txrm_processor import TXRMProcessor
 
@@ -126,7 +126,9 @@ def main():
     
     # Process files
     include_drift = get_user_input("\nInclude drift files? (y/n): ", ['y', 'n']) == 'y'
-    txrm_files = processor.find_txrm_files(search_path, include_drift)
+    
+    # Fix: Call find_txrm_files directly instead of as a method of processor
+    txrm_files = find_txrm_files(search_path, include_drift)
     
     if not txrm_files:
         print("\nNo TXRM files found in the specified path.")
