@@ -271,13 +271,13 @@ class TXRMProcessor(object):
             
             # Generate config file
             config_path = os.path.splitext(file_path)[0] + "_config.txt"
-            if self.config_converter.create_config_from_txrm(file_path):
+            if self.config_converter.create_config_from_txrm(file_path, metadata=metadata):
                 if self.config_converter.save_config(config_path):
-                    print("Configuration saved to: {0}".format(config_path))
+                    self.logger.info(f"Configuration saved to: {config_path}")
                 else:
-                    print("Failed to save configuration file!")
+                    self.logger.error("Failed to save configuration file")
             else:
-                print("Failed to create configuration!")
+                self.logger.error("Failed to create configuration")
             
             return True
             
