@@ -6,7 +6,7 @@ import sys
 
 # Fix module import path if running script directly
 if __name__ == "__main__":
-    # Add parent directory to path so package imports work properly
+    # Get the absolute path of the parent directory (one above new_enhanced_interactive)
     module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     if module_path not in sys.path:
         sys.path.insert(0, module_path)

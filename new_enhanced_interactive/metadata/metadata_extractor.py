@@ -44,4 +44,28 @@ class MetadataExtractor(object):
             'exposure': self.dataset.GetExposure(projection_idx)
         }
         proj_data.update(self.get_axis_positions(projection_idx))
-        return proj_data 
+        return proj_data
+
+    def get_complete_metadata(self, file_path):
+        """Extract all metadata from a TXRM file"""
+        try:
+            self.dataset.ReadFile(file_path)
+            if not self.dataset.IsInitializedCorrectly():
+                return None
+            
+            metadata = {}
+            metadata['basic_info'] = self.get_basic_info()
+            metadata['machine_settings'] = self.get_machine_settings()
+            metadata['image_properties'] = self.get_image_properties()
+            
+            # Extract data for each projection
+            metadata['projection_data'] = []
+            num_projections = self.dataset.GetProjections()
+            for idx in range(num_projections):
+                proj_data = self.get_projection_data(idx)
+                metadata['projection_data'].append(proj_data)
+            
+            return metadata
+        except Exception as e:
+            print("Error extracting metadata: {0}".format(str(e)))
+            return None 

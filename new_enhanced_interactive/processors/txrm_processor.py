@@ -6,7 +6,7 @@ from datetime import datetime
 import gc
 import time
 
-# Use absolute imports
+# Fix the imports to use absolute imports from the package root
 from new_enhanced_interactive.config.txrm_config_converter import TXRMConfigConverter
 from new_enhanced_interactive.metadata.metadata_extractor import MetadataExtractor
 from new_enhanced_interactive.utils.logging_utils import setup_logger
