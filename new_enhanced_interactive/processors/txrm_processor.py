@@ -290,7 +290,7 @@ class TXRMProcessor(object):
 
     def process_single_file(self, file_path):
         try:
-            print("\nProcessing: %s", file_path)
+            print("\nProcessing: {}".format(file_path))
             
             # Validate file and get hash
             valid, message, file_hash = self.validator.validate_file(file_path)

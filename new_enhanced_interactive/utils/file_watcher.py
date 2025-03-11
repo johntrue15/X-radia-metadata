@@ -45,6 +45,8 @@ class TXRMFileWatcher(object):
                         if not self.config.config['include_drift_files'] and 'drift' in txrm_file.lower():
                             continue
                         full_path = os.path.join(root, txrm_file)
+                        # Normalize path for consistency
+                        full_path = os.path.normpath(full_path)
                         if full_path not in self.processed_files:
                             new_files.append(full_path)
         except Exception as e:
@@ -120,29 +122,51 @@ class TXRMFileWatcher(object):
 
     def _process_single_file(self, file_path):
         """Process a single TXRM file"""
-        print("\nProcessing: {0}".format(file_path))
-        if not self.processor.process_single_file(file_path):
-            print("Failed to process file: {0}".format(file_path))
-            return
-        
-        self.processed_files.append(file_path)
-        self._save_processed_files()
-        
-        # Save cumulative CSV
-        csv_path = self.processor.save_cumulative_csv()
-        if not csv_path:
-            print("Warning: Failed to generate cumulative CSV file")
-            return
-        
-        print("Cumulative CSV updated: {0}".format(csv_path))
+        try:
+            print("\nProcessing: {0}".format(file_path))
             
-        # Only attempt GitHub push if manager is configured
-        if self.github_manager:
-            commit_message = "Update metadata CSV - New file: {0}".format(
-                os.path.basename(file_path)
-            )
+            # Check if file exists
+            if not os.path.exists(file_path):
+                print("Error: File does not exist: {0}".format(file_path))
+                return
+                
+            # Check if file is readable
+            try:
+                with open(file_path, 'rb') as f:
+                    # Just check if we can read a few bytes
+                    f.read(10)
+            except Exception as e:
+                print("Error: Cannot read file: {0} - {1}".format(file_path, str(e)))
+                return
+                
+            # Process the file
+            if not self.processor.process_single_file(file_path):
+                print("Failed to process file: {0}".format(file_path))
+                return
             
-            if self.github_manager.commit_and_push_csv(csv_path, commit_message):
-                print("Successfully pushed CSV to GitHub")
-            else:
-                print("Failed to push CSV to GitHub, continuing processing") 
+            # Mark as processed
+            self.processed_files.append(file_path)
+            self._save_processed_files()
+            
+            # Save cumulative CSV
+            csv_path = self.processor.save_cumulative_csv()
+            if not csv_path:
+                print("Warning: Failed to generate cumulative CSV file")
+                return
+            
+            print("Cumulative CSV updated: {0}".format(csv_path))
+                
+            # Only attempt GitHub push if manager is configured
+            if self.github_manager:
+                commit_message = "Update metadata CSV - New file: {0}".format(
+                    os.path.basename(file_path)
+                )
+                
+                if self.github_manager.commit_and_push_csv(csv_path, commit_message):
+                    print("Successfully pushed CSV to GitHub")
+                else:
+                    print("Failed to push CSV to GitHub, continuing processing")
+        except Exception as e:
+            print("Unexpected error processing file {0}: {1}".format(file_path, str(e)))
+            import traceback
+            traceback.print_exc() 

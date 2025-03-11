@@ -49,8 +49,17 @@ class MetadataExtractor(object):
     def get_complete_metadata(self, file_path):
         """Extract all metadata from a TXRM file"""
         try:
+            # Ensure file_path is a proper string and normalize path separators
+            file_path = str(file_path).replace('\\', '/')
+            
+            # Reset the dataset before reading a new file
+            self.dataset = Data.XRMData.XrmBasicDataSet()
+            
+            # Read the file
             self.dataset.ReadFile(file_path)
+            
             if not self.dataset.IsInitializedCorrectly():
+                print("File was not initialized correctly: {}".format(file_path))
                 return None
             
             metadata = {}
