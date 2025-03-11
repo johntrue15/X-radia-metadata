@@ -27,6 +27,24 @@ class MetadataExtractor(object):
             'total_projections': self.dataset.GetProjections()
         }
 
+    def get_images_per_projection(self, tomo_point_index=0):
+        """
+        Gets the number of images that will be taken per projection of the recipe point at the index.
+        Only applicable for flat panel detectors.
+        
+        Args:
+            tomo_point_index (int): The index of the recipe point to check. Defaults to 0.
+            
+        Returns:
+            int: Number of images per projection, or 1 if the function fails or is not applicable.
+        """
+        try:
+            images_per_projection = self.dataset.GetImagesPerProjection(tomo_point_index)
+            return images_per_projection
+        except Exception as e:
+            print("Error getting images per projection: {0}".format(str(e)))
+            return 1  # Default to 1 if the function fails
+
     def get_axis_positions(self, projection_idx):
         axis_data = {}
         axis_names = self.dataset.GetAxesNames()
@@ -66,6 +84,11 @@ class MetadataExtractor(object):
             metadata['basic_info'] = self.get_basic_info()
             metadata['machine_settings'] = self.get_machine_settings()
             metadata['image_properties'] = self.get_image_properties()
+            
+            # Get detector-specific information for flat panel detectors
+            metadata['detector_info'] = {
+                'images_per_projection': self.get_images_per_projection()
+            }
             
             # Extract data for each projection
             metadata['projection_data'] = []

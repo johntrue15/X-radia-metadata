@@ -68,6 +68,14 @@ class TXRMProcessor(object):
                     f.write("%s: %s\n" % (key, value))
                 f.write("\n")
                 
+                # Detector Information
+                if 'detector_info' in metadata:
+                    f.write("Detector Information:\n")
+                    f.write("-" * 20 + "\n")
+                    for key, value in metadata['detector_info'].items():
+                        f.write("%s: %s\n" % (key, value))
+                    f.write("\n")
+                
                 # Projection Data Summary
                 f.write("Projection Data Summary:\n")
                 f.write("-" * 20 + "\n")
@@ -168,7 +176,7 @@ class TXRMProcessor(object):
             ('xray_filter', lambda m: str(m['machine_settings'].get('filter', ''))),  # X-ray: Filter
             ('detector_binning', lambda m: str(m['machine_settings'].get('binning', '0'))),  # Detector: Binning
             ('detector_capture_time', lambda m: str(m['projection_data'][0].get('exposure', '0.0')) if m.get('projection_data') else '0.0'),  # Detector: capture time (s)
-            ('detector_averaging', lambda m: str(len(m.get('projection_data', []))) if m.get('projection_data') else '0'),  # Detector: Averaging
+            ('detector_averaging', lambda m: str(m.get('detector_info', {}).get('images_per_projection', 1))),  # Detector: Averaging (images per projection)
             ('image_width_pixels', lambda m: str(m['image_properties'].get('width', '0'))),  # Image width (pixels)
             ('image_height_pixels', lambda m: str(m['image_properties'].get('height', '0'))),  # Image height (pixels)
             ('image_width_real', lambda m: self._calculate_real_dimension(m, 'width')),  # Image width real
