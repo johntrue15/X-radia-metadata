@@ -155,6 +155,7 @@ class TXRMProcessor(object):
         # Define column order and mappings with clear descriptions based on new format
         column_order = [
             # File Information
+            ('file_hash', lambda m: m.get('file_hash', '')),  # File hash (SHA-256)
             ('file_name', self._get_file_name),  # FILE NAME (minus .txrm)
             ('file_hyperlink', self._get_file_hyperlink),  # File hyperlink
             ('ct_voxel_size_um', lambda m: str(m['machine_settings'].get('pixel_size', '0.0'))),  # CT: Voxel size (um)
@@ -330,32 +331,143 @@ class TXRMProcessor(object):
         except (ValueError, TypeError, ZeroDivisionError):
             return ''
 
+    def _check_and_fix_pixel_size(self, pixel_size):
+        """
+        Check if the pixel size seems reasonable and fix it if not.
+        Pixel size should typically be in the range of 0.5-50 μm for X-ray microscopy.
+        """
+        try:
+            pixel_size_float = float(pixel_size)
+            
+            # If pixel size is unusually large (>100 μm), it might be in the wrong units
+            if pixel_size_float > 100:
+                self.logger.warning("Unusually large pixel size detected: %s μm. Attempting to correct.", pixel_size_float)
+                # Try dividing by 1000 to convert from nm to μm if that's the issue
+                corrected_size = pixel_size_float / 1000
+                self.logger.info("Corrected pixel size: %s μm", corrected_size)
+                return corrected_size
+                
+            # If pixel size is extremely small (<0.01 μm), it might be in the wrong units
+            if 0 < pixel_size_float < 0.01:
+                self.logger.warning("Unusually small pixel size detected: %s μm. Attempting to correct.", pixel_size_float)
+                # Try multiplying by 1000 to convert from mm to μm if that's the issue
+                corrected_size = pixel_size_float * 1000
+                self.logger.info("Corrected pixel size: %s μm", corrected_size)
+                return corrected_size
+                
+            return pixel_size_float
+        except (ValueError, TypeError):
+            return pixel_size
+            
     def _calculate_real_dimension(self, metadata, dimension):
         """Calculate real dimension (pixels × pixel size)"""
         try:
             pixels = float(metadata['image_properties'].get(dimension, 0))
-            pixel_size = float(metadata['machine_settings'].get('pixel_size', 0))
+            raw_pixel_size = metadata['machine_settings'].get('pixel_size', 0)
+            
+            # Check and fix pixel size if needed
+            pixel_size = self._check_and_fix_pixel_size(raw_pixel_size)
+            
+            # Log the values for debugging
+            self.logger.debug("Calculating real dimension for %s: pixels=%s, raw_pixel_size=%s, corrected_pixel_size=%s", 
+                             dimension, pixels, raw_pixel_size, pixel_size)
+            
             if pixels > 0 and pixel_size > 0:
                 # Real dimension = number of pixels × pixel size in μm
                 real_dimension = pixels * pixel_size
+                
+                # Log the calculated value
+                self.logger.debug("Calculated real dimension: %s μm", real_dimension)
+                
+                # Check if the result seems reasonable (less than 100,000 μm which is 10cm)
+                if real_dimension > 100000:
+                    self.logger.warning("Unusually large real dimension calculated: %s μm. Check pixel size units.", real_dimension)
+                
                 return str(round(real_dimension, 2))
             return ''
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as e:
+            self.logger.error("Error calculating real dimension: %s", str(e))
             return ''
 
+    def _parse_date_string(self, date_string):
+        """
+        Parse a date string using multiple possible formats.
+        Returns a datetime object if successful, None otherwise.
+        """
+        if not date_string or not isinstance(date_string, str):
+            return None
+            
+        # List of possible date formats to try
+        date_formats = [
+            "%m/%d/%Y %H:%M:%S.%f",  # 09/10/2022 15:17:54.773
+            "%m/%d/%Y %H:%M:%S",     # 09/10/2022 15:17:54
+            "%Y-%m-%d %H:%M:%S.%f",  # 2022-09-10 15:17:54.773
+            "%Y-%m-%d %H:%M:%S",     # 2022-09-10 15:17:54
+            "%d/%m/%Y %H:%M:%S.%f",  # 10/09/2022 15:17:54.773 (European format)
+            "%d/%m/%Y %H:%M:%S"      # 10/09/2022 15:17:54 (European format)
+        ]
+        
+        from datetime import datetime
+        
+        # Try each format until one works
+        for date_format in date_formats:
+            try:
+                return datetime.strptime(date_string, date_format)
+            except ValueError:
+                continue
+                
+        # If we get here, none of the formats worked
+        self.logger.error("Could not parse date string: %s", date_string)
+        return None
+        
     def _calculate_scan_time(self, metadata):
         """Calculate scan time (end time - start time)"""
         try:
             if not metadata.get('projection_data'):
+                self.logger.warning("No projection data found for scan time calculation")
                 return ''
+                
             start_time = metadata['projection_data'][0].get('date')
             end_time = metadata['projection_data'][-1].get('date')
-            if start_time and end_time:
-                # Calculate the time difference between the first and last projection
+            
+            # Log the raw date values for debugging
+            self.logger.debug("Start time (raw): %s", start_time)
+            self.logger.debug("End time (raw): %s", end_time)
+            
+            # If the dates are already datetime objects, use them directly
+            if start_time and end_time and isinstance(start_time, datetime) and isinstance(end_time, datetime):
                 time_diff = end_time - start_time
+                self.logger.debug("Time difference (datetime objects): %s", time_diff)
                 return str(time_diff)
+                
+            # If the dates are strings, parse them
+            if start_time and end_time:
+                # Try to parse the date strings
+                start_dt = self._parse_date_string(str(start_time))
+                end_dt = self._parse_date_string(str(end_time))
+                
+                if start_dt and end_dt:
+                    self.logger.debug("Parsed start time: %s", start_dt)
+                    self.logger.debug("Parsed end time: %s", end_dt)
+                    
+                    # Calculate the time difference
+                    time_diff = end_dt - start_dt
+                    
+                    # Format the time difference as hours:minutes:seconds
+                    total_seconds = time_diff.total_seconds()
+                    hours = int(total_seconds // 3600)
+                    minutes = int((total_seconds % 3600) // 60)
+                    seconds = int(total_seconds % 60)
+                    
+                    formatted_time = "{:02d}:{:02d}:{:02d}".format(hours, minutes, seconds)
+                    self.logger.debug("Formatted time difference: %s", formatted_time)
+                    
+                    return formatted_time
+            
+            self.logger.warning("Could not calculate scan time: invalid date values")
             return ''
-        except (IndexError, TypeError, ValueError):
+        except (IndexError, TypeError, ValueError) as e:
+            self.logger.error("Error calculating scan time: %s", str(e))
             return ''
 
     def _get_axis_position(self, metadata, axis_name, index):
@@ -409,6 +521,17 @@ class TXRMProcessor(object):
                 self.logger.error("Failed to extract metadata from file: %s", file_path)
                 print("Error: Failed to extract metadata from file")
                 return False
+            
+            # Log key metadata values for debugging
+            self.logger.debug("File: %s", file_path)
+            self.logger.debug("Image dimensions: %s x %s pixels", 
+                             metadata['image_properties'].get('width', 'N/A'),
+                             metadata['image_properties'].get('height', 'N/A'))
+            self.logger.debug("Pixel size: %s μm", metadata['machine_settings'].get('pixel_size', 'N/A'))
+            
+            if metadata.get('projection_data'):
+                self.logger.debug("First projection date: %s", metadata['projection_data'][0].get('date', 'N/A'))
+                self.logger.debug("Last projection date: %s", metadata['projection_data'][-1].get('date', 'N/A'))
                 
             # Add file path and hash to metadata
             metadata['file_path'] = file_path
