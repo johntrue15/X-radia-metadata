@@ -407,8 +407,6 @@ class TXRMProcessor(object):
             "%d/%m/%Y %H:%M:%S"      # 10/09/2022 15:17:54 (European format)
         ]
         
-        from datetime import datetime
-        
         # Try each format until one works
         for date_format in date_formats:
             try:
