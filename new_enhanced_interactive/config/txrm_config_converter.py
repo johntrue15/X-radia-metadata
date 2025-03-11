@@ -67,12 +67,12 @@ class TXRMConfigConverter(object):
                         value = first_proj[metadata_name]
                         if value is not None:
                             self.config.set('Axis', config_name, str(value))
-                            self.logger.info("Set axis {0} to {1}".format(config_name, value))
+                            self.logger.info("Set axis %s to %s", config_name, value)
                         else:
-                            self.logger.warning("Axis {0} value is None".format(metadata_name))
+                            self.logger.warning("Axis %s value is None", metadata_name)
                             self.config.set('Axis', config_name, '0.0')
                     else:
-                        self.logger.warning("Axis {0} not found in metadata".format(metadata_name))
+                        self.logger.warning("Axis %s not found in metadata", metadata_name)
                         self.config.set('Axis', config_name, '0.0')
             else:
                 self.logger.error("No projection data found in metadata")
@@ -83,10 +83,10 @@ class TXRMConfigConverter(object):
                     if dataset_name in positions:
                         self.config.set('Axis', config_name, str(positions[dataset_name]))
                     else:
-                        self.logger.warning("Axis {0} not found in dataset".format(dataset_name))
+                        self.logger.warning("Axis %s not found in dataset", dataset_name)
                         self.config.set('Axis', config_name, '0.0')
         except Exception as e:
-            self.logger.error("Error setting axis positions: {0}".format(str(e)), exc_info=True)
+            self.logger.error("Error setting axis positions: %s", str(e), exc_info=True)
             # Fallback to setting all axes to 0.0 if there's an error
             for config_name in axis_mapping:
                 self.config.set('Axis', config_name, '0.0')
@@ -109,7 +109,7 @@ class TXRMConfigConverter(object):
             self._fill_general_section()
             return True
         except Exception as e:
-            self.logger.error("Error processing TXRM file: {0}".format(str(e)), exc_info=True)
+            self.logger.error("Error processing TXRM file: %s", str(e), exc_info=True)
             return False
 
     def save_config(self, output_path):
@@ -118,7 +118,7 @@ class TXRMConfigConverter(object):
                 self.config.write(configfile)
             return True
         except Exception as e:
-            self.logger.error("Error saving config file: {0}".format(str(e)))
+            self.logger.error("Error saving config file: %s", str(e))
             return False
 
     # ... (rest of the config converter methods) 
