@@ -139,21 +139,33 @@ def main():
         ['1', '2']
     )
     
+    processed_count = 0
     for i, file_path in enumerate(txrm_files, 1):
         print("\nFile {0} of {1}:".format(i, len(txrm_files)))
         print(file_path)
         
+        # Skip drift files if not included
+        if not include_drift and 'drift' in os.path.basename(file_path).lower():
+            print("Skipping drift file (not included in processing)")
+            continue
+            
         if process_mode == '2':
             if not _handle_interactive_mode(file_path):
                 break
         
-        processor.process_single_file(file_path)
+        if processor.process_single_file(file_path):
+            processed_count += 1
     
     # Generate cumulative CSV file after processing all files
     if processor.all_metadata:
+        print("\nProcessed {0} files successfully.".format(processed_count))
         csv_path = processor.save_cumulative_csv()
         if csv_path:
             print("\nCumulative CSV file saved to: {0}".format(csv_path))
+        else:
+            print("\nError: Failed to generate cumulative CSV file.")
+    else:
+        print("\nNo metadata was collected. CSV file not generated.")
     
     print("\nProcessing complete!")
 

@@ -106,69 +106,159 @@ class TXRMProcessor(object):
         """Get file path"""
         return m.get('file_path', '')
 
+    def _get_file_hyperlink(self, m):
+        """Create a file hyperlink that opens the file when clicked"""
+        file_path = m.get('file_path', '')
+        if file_path:
+            # Create a hyperlink formula that works in Excel
+            # Use file:/// protocol for local files to ensure it works on the same workstation
+            file_url = 'file:///' + file_path.replace('\\', '/').lstrip('/')
+            return '=HYPERLINK("{0}","{1}")'.format(
+                file_url,
+                os.path.basename(file_path)
+            )
+        return ''
+
+    def _calculate_xray_power(self, metadata):
+        """Safely calculate X-ray tube power if not already available"""
+        try:
+            # First check if power is already available
+            power = metadata['machine_settings'].get('power')
+            if power is not None and power != '':
+                return str(power)
+                
+            # If not, calculate from voltage and current
+            voltage = float(metadata['machine_settings'].get('voltage', 0))
+            # Current is in μA, need to convert to A for power calculation
+            current_ua = float(metadata['machine_settings'].get('current', 0))
+            if voltage > 0 and current_ua > 0:
+                # Convert μA to A (divide by 1,000,000) then multiply by voltage
+                power_watts = (current_ua / 1000000) * voltage
+                return str(round(power_watts, 2))
+            return ''
+        except (ValueError, TypeError, ZeroDivisionError):
+            return ''
+
     def save_cumulative_csv(self):
         """Save all collected metadata to a single CSV file with specified column order"""
         if not self.all_metadata:
             self.logger.warning("No metadata to save to cumulative CSV")
             return False
         
-        # Define column order and mappings with clear descriptions
+        # Filter out any None or empty metadata entries
+        filtered_metadata = [m for m in self.all_metadata if m and isinstance(m, dict)]
+        
+        if not filtered_metadata:
+            self.logger.warning("No valid metadata entries to save after filtering")
+            return False
+            
+        # Define column order and mappings with clear descriptions based on new format
         column_order = [
             # File Information
-            ('file_name', self._get_file_name),
-            ('file_hash', lambda m: m.get('file_hash', '')),
-            ('file_size_bytes', lambda m: str(m['validation_info'].get('size', ''))),
-            ('validation_timestamp', lambda m: time.strftime('%Y-%m-%d %H:%M:%S', 
-                time.localtime(m['validation_info'].get('validated_at', 0)))),
-            ('file_path', lambda m: os.path.dirname(m.get('file_path', ''))),
-            ('txrm_file_path', self._get_file_path),
-            ('acquisition_successful', lambda m: str(m['basic_info'].get('initialized_correctly', 'False'))),
-            
-            # Machine Settings
-            ('ct_voxel_size_um', lambda m: str(m['machine_settings'].get('pixel_size', '0.0'))),
-            ('ct_objective', lambda m: str(m['machine_settings'].get('objective', ''))),
-            ('ct_number_images', lambda m: str(m['image_properties'].get('total_projections', '0'))),
-            ('ct_optical_magnification', lambda m: 'yes' if str(m['machine_settings'].get('objective', '')).lower() in ['4x', '20x', '40x'] else 'no'),
-            ('xray_tube_voltage', lambda m: str(m['machine_settings'].get('voltage', '0.0'))),
-            ('xray_tube_power', lambda m: str(m['machine_settings'].get('power', '0.0'))),
-            ('xray_tube_current', self._calculate_xray_current),
-            ('xray_filter', lambda m: str(m['machine_settings'].get('filter', ''))),
-            
-            # Detector Settings
-            ('detector_binning', lambda m: str(m['machine_settings'].get('binning', '0'))),
-            ('detector_capture_time', lambda m: str(m['projection_data'][0].get('exposure', '0.0')) if m.get('projection_data') else '0.0'),
-            ('detector_averaging', lambda m: str(len(m.get('projection_data', []))) if m.get('projection_data') else '0'),
-            
-            # Image Properties
-            ('image_width_pixels', lambda m: str(m['image_properties'].get('width', '0'))),
-            ('image_height_pixels', lambda m: str(m['image_properties'].get('height', '0'))),
-            ('image_width_real', lambda m: self._calculate_real_dimension(m, 'width')),
-            ('image_height_real', lambda m: self._calculate_real_dimension(m, 'height')),
-            
-            # Time Information
-            ('scan_time', self._calculate_scan_time),
-            ('start_time', lambda m: str(m['projection_data'][0].get('date', '')) if m.get('projection_data') else ''),
-            ('end_time', lambda m: str(m['projection_data'][-1].get('date', '')) if m.get('projection_data') else '')
+            ('file_name', self._get_file_name),  # FILE NAME (minus .txrm)
+            ('file_hyperlink', self._get_file_hyperlink),  # File hyperlink
+            ('ct_voxel_size_um', lambda m: str(m['machine_settings'].get('pixel_size', '0.0'))),  # CT: Voxel size (um)
+            ('ct_objective', lambda m: str(m['machine_settings'].get('objective', ''))),  # CT: Objective
+            ('ct_number_images', lambda m: str(m['image_properties'].get('total_projections', '0'))),  # CT: Number of images
+            ('ct_optical_magnification', lambda m: 'yes' if str(m['machine_settings'].get('objective', '')).lower() in ['4x', '20x', '40x'] else 'no'),  # CT: Optical magnification
+            ('xray_tube_voltage', lambda m: str(m['machine_settings'].get('voltage', '0.0'))),  # X-ray Tube: voltage
+            ('xray_tube_power', self._calculate_xray_power),  # X-ray Tube: power (W)
+            ('xray_tube_current', self._calculate_xray_current),  # Xray tube: current (uA)
+            ('xray_filter', lambda m: str(m['machine_settings'].get('filter', ''))),  # X-ray: Filter
+            ('detector_binning', lambda m: str(m['machine_settings'].get('binning', '0'))),  # Detector: Binning
+            ('detector_capture_time', lambda m: str(m['projection_data'][0].get('exposure', '0.0')) if m.get('projection_data') else '0.0'),  # Detector: capture time (s)
+            ('detector_averaging', lambda m: str(len(m.get('projection_data', []))) if m.get('projection_data') else '0'),  # Detector: Averaging
+            ('image_width_pixels', lambda m: str(m['image_properties'].get('width', '0'))),  # Image width (pixels)
+            ('image_height_pixels', lambda m: str(m['image_properties'].get('height', '0'))),  # Image height (pixels)
+            ('image_width_real', lambda m: self._calculate_real_dimension(m, 'width')),  # Image width real
+            ('image_height_real', lambda m: self._calculate_real_dimension(m, 'height')),  # Image height real
+            ('scan_time', self._calculate_scan_time),  # Scan time
+            ('start_time', lambda m: str(m['projection_data'][0].get('date', '')) if m.get('projection_data') else ''),  # Start time
+            ('end_time', lambda m: str(m['projection_data'][-1].get('date', '')) if m.get('projection_data') else ''),  # End time
+            ('txrm_file_path', self._get_file_path),  # TXRM File path
+            ('file_path', lambda m: os.path.dirname(m.get('file_path', ''))),  # File path
+            ('acquisition_successful', lambda m: str(m['basic_info'].get('initialized_correctly', 'False'))),  # Acquisition stage successful?
         ]
 
-        # Add all axis-related columns with proper formatting
-        axes = [
+        # Add sample axis positions
+        sample_axes = [
             ('Sample X', 'Sample_X_pos'),
             ('Sample Y', 'Sample_Y_pos'),
             ('Sample Z', 'Sample_Z_pos'),
             ('Sample Theta', 'Sample_Theta_pos'),
+        ]
+        
+        for display_name, metadata_name in sample_axes:
+            safe_name = display_name.lower().replace(' ', '_')
+            column_order.extend([
+                ('{0}_start'.format(safe_name), lambda m, name=metadata_name: self._get_axis_position(m, name, 0)),
+                ('{0}_end'.format(safe_name), lambda m, name=metadata_name: self._get_axis_position(m, name, -1)),
+                ('{0}_range'.format(safe_name), lambda m, name=metadata_name: self._calculate_axis_range_new(m, name))
+            ])
+        
+        # Add source axis positions
+        source_axes = [
             ('Source X', 'Source_X_pos'),
             ('Source Z', 'Source_Z_pos'),
+        ]
+        
+        for display_name, metadata_name in source_axes:
+            safe_name = display_name.lower().replace(' ', '_')
+            column_order.extend([
+                ('{0}_start'.format(safe_name), lambda m, name=metadata_name: self._get_axis_position(m, name, 0)),
+                ('{0}_end'.format(safe_name), lambda m, name=metadata_name: self._get_axis_position(m, name, -1)),
+                ('{0}_range'.format(safe_name), lambda m, name=metadata_name: self._calculate_axis_range_new(m, name))
+            ])
+        
+        # Add flat panel axis positions
+        flat_panel_axes = [
             ('Flat Panel Z', 'Flat_Panel_Z_pos'),
             ('Flat Panel X', 'Flat_Panel_X_pos'),
+        ]
+        
+        for display_name, metadata_name in flat_panel_axes:
+            safe_name = display_name.lower().replace(' ', '_')
+            column_order.extend([
+                ('{0}_start'.format(safe_name), lambda m, name=metadata_name: self._get_axis_position(m, name, 0)),
+                ('{0}_end'.format(safe_name), lambda m, name=metadata_name: self._get_axis_position(m, name, -1)),
+                ('{0}_range'.format(safe_name), lambda m, name=metadata_name: self._calculate_axis_range_new(m, name))
+            ])
+        
+        # Add detector axis positions
+        detector_axes = [
             ('Detector Z', 'Detector_Z_pos'),
+        ]
+        
+        for display_name, metadata_name in detector_axes:
+            safe_name = display_name.lower().replace(' ', '_')
+            column_order.extend([
+                ('{0}_start'.format(safe_name), lambda m, name=metadata_name: self._get_axis_position(m, name, 0)),
+                ('{0}_end'.format(safe_name), lambda m, name=metadata_name: self._get_axis_position(m, name, -1)),
+                ('{0}_range'.format(safe_name), lambda m, name=metadata_name: self._calculate_axis_range_new(m, name))
+            ])
+        
+        # Add CCD axis positions (which might be the "???" in the requirements)
+        ccd_axes = [
             ('CCD Z', 'CCD_Z_pos'),
             ('CCD X', 'CCD_X_pos'),
+        ]
+        
+        for display_name, metadata_name in ccd_axes:
+            safe_name = display_name.lower().replace(' ', '_')
+            column_order.extend([
+                ('{0}_start'.format(safe_name), lambda m, name=metadata_name: self._get_axis_position(m, name, 0)),
+                ('{0}_end'.format(safe_name), lambda m, name=metadata_name: self._get_axis_position(m, name, -1)),
+                ('{0}_range'.format(safe_name), lambda m, name=metadata_name: self._calculate_axis_range_new(m, name))
+            ])
+            
+        # Add any remaining axes that might be in the data but not explicitly listed
+        # This covers the "???" fields in the requirements
+        other_axes = [
             ('MkIV Filter Wheel', 'MkIV_Filter_Wheel_pos'),
             ('DCT', 'DCT_pos')
         ]
         
-        for display_name, metadata_name in axes:
+        for display_name, metadata_name in other_axes:
             safe_name = display_name.lower().replace(' ', '_')
             column_order.extend([
                 ('{0}_start'.format(safe_name), lambda m, name=metadata_name: self._get_axis_position(m, name, 0)),
@@ -193,7 +283,7 @@ class TXRMProcessor(object):
         try:
             # Prepare data with specified column order
             rows = []
-            for metadata in self.all_metadata:
+            for metadata in filtered_metadata:
                 row = {}
                 for column_name, value_func in column_order:
                     try:
@@ -206,13 +296,15 @@ class TXRMProcessor(object):
                     except Exception as e:
                         self.logger.warning("Error getting value for %s: %s", column_name, str(e))
                         row[column_name] = ''
-                rows.append(row)
+                # Only add non-empty rows
+                if any(row.values()):
+                    rows.append(row)
 
             # Write to CSV with specified column order
             fieldnames = [col[0] for col in column_order]
             
             with open(csv_path, 'w') as csvfile:  # Changed from 'wb' to 'w' for better compatibility
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
                 writer.writeheader()
                 for row in rows:
                     writer.writerow(row)
@@ -239,24 +331,27 @@ class TXRMProcessor(object):
             return ''
 
     def _calculate_real_dimension(self, metadata, dimension):
-        """Safely calculate real dimension"""
+        """Calculate real dimension (pixels × pixel size)"""
         try:
             pixels = float(metadata['image_properties'].get(dimension, 0))
             pixel_size = float(metadata['machine_settings'].get('pixel_size', 0))
             if pixels > 0 and pixel_size > 0:
-                return str(round(pixels * pixel_size, 2))
+                # Real dimension = number of pixels × pixel size in μm
+                real_dimension = pixels * pixel_size
+                return str(round(real_dimension, 2))
             return ''
         except (ValueError, TypeError):
             return ''
 
     def _calculate_scan_time(self, metadata):
-        """Safely calculate scan time"""
+        """Calculate scan time (end time - start time)"""
         try:
             if not metadata.get('projection_data'):
                 return ''
             start_time = metadata['projection_data'][0].get('date')
             end_time = metadata['projection_data'][-1].get('date')
             if start_time and end_time:
+                # Calculate the time difference between the first and last projection
                 time_diff = end_time - start_time
                 return str(time_diff)
             return ''
@@ -292,6 +387,11 @@ class TXRMProcessor(object):
         try:
             print("\nProcessing: {}".format(file_path))
             
+            # Check if this is a drift file
+            is_drift = 'drift' in os.path.basename(file_path).lower()
+            if is_drift:
+                self.logger.info("Processing drift file: %s", file_path)
+            
             # Validate file and get hash
             valid, message, file_hash = self.validator.validate_file(file_path)
             if not valid:
@@ -306,12 +406,15 @@ class TXRMProcessor(object):
             # Get metadata
             metadata = self.metadata_extractor.get_complete_metadata(file_path)
             if not metadata:
+                self.logger.error("Failed to extract metadata from file: %s", file_path)
+                print("Error: Failed to extract metadata from file")
                 return False
                 
             # Add file path and hash to metadata
             metadata['file_path'] = file_path
             metadata['file_hash'] = file_hash
             metadata['validation_info'] = self.validator.get_validation_info(file_path)
+            metadata['is_drift_file'] = is_drift
             
             # Save metadata as text file next to TXRM file
             if not self.save_metadata_txt(metadata, file_path):

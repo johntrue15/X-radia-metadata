@@ -38,17 +38,24 @@ class TXRMFileWatcher(object):
     def _get_new_txrm_files(self):
         """Get list of new TXRM files in watch directory"""
         new_files = []
+        drift_files_skipped = 0
         try:
             for root, _, files in os.walk(self.config.config['watch_directory']):
                 for txrm_file in files:
                     if txrm_file.lower().endswith('.txrm'):
-                        if not self.config.config['include_drift_files'] and 'drift' in txrm_file.lower():
+                        is_drift = 'drift' in txrm_file.lower()
+                        if not self.config.config['include_drift_files'] and is_drift:
+                            drift_files_skipped += 1
                             continue
                         full_path = os.path.join(root, txrm_file)
                         # Normalize path for consistency
                         full_path = os.path.normpath(full_path)
                         if full_path not in self.processed_files:
                             new_files.append(full_path)
+            
+            if drift_files_skipped > 0:
+                print("Skipped {0} drift files (not included in processing)".format(drift_files_skipped))
+                
         except Exception as e:
             print("Error scanning directory: {0}".format(str(e)))
         return new_files
@@ -133,6 +140,11 @@ class TXRMFileWatcher(object):
         """Process a single TXRM file"""
         try:
             print("\nProcessing: {0}".format(file_path))
+            
+            # Check if this is a drift file
+            is_drift = 'drift' in os.path.basename(file_path).lower()
+            if is_drift:
+                print("Processing drift file")
             
             # Check if file exists
             if not os.path.exists(file_path):
