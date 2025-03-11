@@ -45,6 +45,87 @@ class CompleteAPIMetadataExtractor:
         }
         return properties
 
+    def get_images_per_projection(self, tomo_point_index):
+        """
+        Gets the number of images that will be taken per projection of the recipe point at the index.
+        Only use this function for a flat panel detector.
+        
+        Args:
+            tomo_point_index (int): The index of the recipe point that will be checked.
+            
+        Returns:
+            int: Number of images per projection, or -1 if the function fails.
+        """
+        try:
+            images_per_projection = self.dataset.GetImagesPerProjection(tomo_point_index)
+            return images_per_projection
+        except Exception as e:
+            error_msg = f"Error getting images per projection for index {tomo_point_index}: {str(e)}"
+            self.logger.error(error_msg)
+            print(error_msg)
+            return -1
+            
+    def set_images_per_projection(self, tomo_point_index, images_per_projection):
+        """
+        Sets the number of images that will be taken per projection of the recipe point at the index.
+        
+        Args:
+            tomo_point_index (int): The index of the recipe point that will be checked.
+            images_per_projection (int): The number of images that will be taken per projection.
+            
+        Returns:
+            bool: True if the function succeeds, False if the function fails.
+        """
+        try:
+            result = self.dataset.SetImagesPerProjection(tomo_point_index, images_per_projection)
+            return result
+        except Exception as e:
+            error_msg = f"Error setting images per projection for index {tomo_point_index}: {str(e)}"
+            self.logger.error(error_msg)
+            print(error_msg)
+            return False
+    
+    def get_number_of_frames_per_image(self, tomo_point_index):
+        """
+        Gets the number of frames per image of the recipe point at the index.
+        Only use this function for a flat panel detector.
+        
+        Args:
+            tomo_point_index (int): The index of the recipe point that will be checked.
+            
+        Returns:
+            int: Number of frames per image, or -1 if the function fails.
+        """
+        try:
+            frames_per_image = self.dataset.GetNumberOfFramesPerImage(tomo_point_index)
+            return frames_per_image
+        except Exception as e:
+            error_msg = f"Error getting frames per image for index {tomo_point_index}: {str(e)}"
+            self.logger.error(error_msg)
+            print(error_msg)
+            return -1
+    
+    def set_number_of_frames_per_image(self, tomo_point_index, frames):
+        """
+        Sets the number of frames per image of the recipe point at the index.
+        Only use this function for detectors with a flat panel.
+        
+        Args:
+            tomo_point_index (int): The index of the recipe point that will be checked.
+            frames (int): The new value for the number of frames per image.
+            
+        Returns:
+            bool: True if the function succeeds, False if the function fails.
+        """
+        try:
+            result = self.dataset.SetNumberOfFramesPerImage(tomo_point_index, frames)
+            return result
+        except Exception as e:
+            error_msg = f"Error setting frames per image for index {tomo_point_index}: {str(e)}"
+            self.logger.error(error_msg)
+            print(error_msg)
+            return False
+
     def get_axis_positions(self, projection_idx):
         axis_data = {}
         axis_names = self.dataset.GetAxesNames()
