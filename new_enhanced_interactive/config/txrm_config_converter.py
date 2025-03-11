@@ -99,7 +99,16 @@ class TXRMConfigConverter(object):
         try:
             self.config = ConfigParser.ConfigParser()
             self.metadata = metadata  # Store metadata for use in axis section
+            
+            # Ensure txrm_path is a proper string and normalize path separators
+            txrm_path = str(txrm_path).replace('\\', '/')
+            
+            # Reset the dataset before reading a new file
+            self.dataset = Data.XRMData.XrmBasicDataSet()
+            
+            # Read the file
             self.dataset.ReadFile(txrm_path)
+            
             self._init_config_sections()
             self._fill_geometry_section()
             self._fill_ct_and_xray_section()

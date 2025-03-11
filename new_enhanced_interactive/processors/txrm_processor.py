@@ -320,15 +320,19 @@ class TXRMProcessor(object):
             # Store metadata for cumulative CSV
             self.all_metadata.append(metadata)
             
-            # Generate config file
+            # Generate config file - continue even if this fails
             config_path = os.path.splitext(file_path)[0] + "_config.txt"
-            if self.config_converter.create_config_from_txrm(file_path, metadata=metadata):
-                if self.config_converter.save_config(config_path):
-                    self.logger.info("Configuration saved to: %s", config_path)
+            try:
+                if self.config_converter.create_config_from_txrm(file_path, metadata=metadata):
+                    if self.config_converter.save_config(config_path):
+                        self.logger.info("Configuration saved to: %s", config_path)
+                    else:
+                        self.logger.error("Failed to save configuration file")
                 else:
-                    self.logger.error("Failed to save configuration file")
-            else:
-                self.logger.error("Failed to create configuration")
+                    self.logger.error("Failed to create configuration")
+            except Exception as e:
+                self.logger.error("Error generating config file: %s", str(e), exc_info=True)
+                print("Warning: Could not generate config file, but continuing with metadata processing")
             
             return True
             

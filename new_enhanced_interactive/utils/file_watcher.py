@@ -88,6 +88,15 @@ class TXRMFileWatcher(object):
         print("Watching directory: {0}".format(self.config.config['watch_directory']))
         print("Polling interval: {0} seconds".format(self.config.config['polling_interval']))
         
+        # Ensure output directory exists
+        output_dir = self.config.config.get('cumulative_csv_path')
+        if output_dir and not os.path.exists(output_dir):
+            try:
+                os.makedirs(output_dir)
+                print("Created output directory: {0}".format(output_dir))
+            except Exception as e:
+                print("Warning: Could not create output directory: {0}".format(str(e)))
+        
         if self.github_manager:
             print("GitHub integration enabled")
         
