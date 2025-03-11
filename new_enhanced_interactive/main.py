@@ -149,6 +149,12 @@ def main():
         
         processor.process_single_file(file_path)
     
+    # Generate cumulative CSV file after processing all files
+    if processor.all_metadata:
+        csv_path = processor.save_cumulative_csv()
+        if csv_path:
+            print("\nCumulative CSV file saved to: {0}".format(csv_path))
+    
     print("\nProcessing complete!")
 
 if __name__ == "__main__":

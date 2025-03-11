@@ -122,6 +122,7 @@ class TXRMFileWatcher(object):
         """Process a single TXRM file"""
         print("\nProcessing: {0}".format(file_path))
         if not self.processor.process_single_file(file_path):
+            print("Failed to process file: {0}".format(file_path))
             return
         
         self.processed_files.append(file_path)
@@ -130,7 +131,10 @@ class TXRMFileWatcher(object):
         # Save cumulative CSV
         csv_path = self.processor.save_cumulative_csv()
         if not csv_path:
+            print("Warning: Failed to generate cumulative CSV file")
             return
+        
+        print("Cumulative CSV updated: {0}".format(csv_path))
             
         # Only attempt GitHub push if manager is configured
         if self.github_manager:

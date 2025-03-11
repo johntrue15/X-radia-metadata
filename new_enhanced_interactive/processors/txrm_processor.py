@@ -15,6 +15,14 @@ from new_enhanced_interactive.utils.validation_utils import TXRMValidator
 class TXRMProcessor(object):
     def __init__(self, output_dir=None):
         self.output_dir = output_dir or os.path.join(os.getcwd(), "metadata_output")
+        
+        # Create output directory if it doesn't exist
+        if not os.path.exists(self.output_dir):
+            try:
+                os.makedirs(self.output_dir)
+            except Exception as e:
+                print("Warning: Could not create output directory: {}".format(str(e)))
+        
         self.all_metadata = []  # Store metadata from all processed files
         self.config_converter = TXRMConfigConverter()
         self.metadata_extractor = MetadataExtractor()
@@ -168,6 +176,17 @@ class TXRMProcessor(object):
                 ('{0}_range'.format(safe_name), lambda m, name=metadata_name: self._calculate_axis_range_new(m, name))
             ])
 
+        # Create output directory if it doesn't exist
+        if not os.path.exists(self.output_dir):
+            try:
+                os.makedirs(self.output_dir)
+                self.logger.info("Created output directory: %s", self.output_dir)
+            except Exception as e:
+                error_msg = "Error creating output directory: %s" % str(e)
+                self.logger.error(error_msg)
+                print(error_msg)
+                return False
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         csv_path = os.path.join(self.output_dir, "cumulative_metadata_{0}.csv".format(timestamp))
         
@@ -199,7 +218,7 @@ class TXRMProcessor(object):
                     writer.writerow(row)
                 
             self.logger.info("Cumulative metadata saved to: %s", csv_path)
-            print("\nCumulative metadata saved to: %s", csv_path)
+            print("\nCumulative metadata saved to: {}".format(csv_path))
             return csv_path
             
         except Exception as e:
