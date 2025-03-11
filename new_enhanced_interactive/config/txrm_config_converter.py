@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 import ConfigParser
-import os
 from XradiaPy import Data
-from new_enhanced_interactive.utils.logger import setup_logger
+from new_enhanced_interactive.utils.logging_utils import setup_logger
 
 class TXRMConfigConverter(object):
     def __init__(self):

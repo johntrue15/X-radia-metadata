@@ -4,18 +4,18 @@ import os
 import ctypes
 import sys
 
+# Import all required modules at the top level
+from new_enhanced_interactive.config.watch_config import WatchConfig
+from new_enhanced_interactive.utils.file_utils import get_user_input, find_txrm_files
+from new_enhanced_interactive.utils.file_watcher import TXRMFileWatcher
+from new_enhanced_interactive.processors.txrm_processor import TXRMProcessor
+
 # Fix module import path if running script directly
 if __name__ == "__main__":
     # Get the absolute path of the parent directory (one above new_enhanced_interactive)
     module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     if module_path not in sys.path:
         sys.path.insert(0, module_path)
-
-# Import all required modules at the top level
-from new_enhanced_interactive.config.watch_config import WatchConfig
-from new_enhanced_interactive.utils.file_utils import get_user_input, find_txrm_files
-from new_enhanced_interactive.utils.file_watcher import TXRMFileWatcher
-from new_enhanced_interactive.processors.txrm_processor import TXRMProcessor
 
 def check_admin():
     """Cross-platform admin check"""
