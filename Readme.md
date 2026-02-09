@@ -1,203 +1,393 @@
 # X-radia Metadata Extractor
 
-A Python-based tool for extracting and processing metadata from X-radia TXRM files. This tool provides automated metadata extraction, configuration file generation, and continuous monitoring of TXRM files.
+A comprehensive Python tool for extracting and processing metadata from X-radia TXRM files. This tool provides automated metadata extraction, configuration file generation, CSV export, and continuous directory monitoring.
+
+## Features
+
+- **Automated Metadata Extraction**: Extract comprehensive metadata from TXRM files
+- **Multiple Output Formats**: Generate text files, configuration files, and cumulative CSV
+- **Watch Mode**: Automatically monitor directories for new TXRM files
+- **Interactive & Batch Processing**: Choose your workflow preference
+- **Docker Support**: Run in a container - no Python installation required
+- **PyCharm Integration**: Pre-configured run configurations for easy development
+- **System Detection**: Auto-detect Python and XradiaPy installation
+- **Contact Management**: Track metadata attribution with contacts.csv
+
+---
+
+## Quick Start
+
+### Option 1: One-Click Start (Recommended)
+
+**Windows:** Double-click `run.bat`
+
+**Mac/Linux:** Run `./run.sh`
+
+The smart launcher shows what's installed and guides you through setup.
+
+### Option 2: Docker (No Python Required)
+
+```bash
+# Windows
+docker-run.bat C:\path\to\txrm\files
+
+# Mac/Linux
+./docker-run.sh /path/to/txrm/files
+```
+
+See [DOCKER.md](DOCKER.md) for full Docker documentation.
+
+### Option 3: Manual Setup
+
+1. **Download** the repository as ZIP from GitHub
+2. **Extract** to your preferred location
+3. **Run the smart launcher**:
+   ```bash
+   python start.py
+   ```
+
+### For Developers (Git Clone)
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/X-radia-metadata.git
+cd X-radia-metadata
+
+# Run smart launcher (checks system & guides setup)
+python start.py
+
+# Or run system check directly
+python system_check.py
+```
+
+---
 
 ## Prerequisites
 
-- Python 2.7 (required for XradiaPy compatibility)
-- PyCharm IDE (recommended)
-- Xradia Software Suite installed (for XradiaPy package)
-- Git (optional, only needed if using GitHub integration)
+### Option A: Docker (Easiest)
+
+| Requirement | Details |
+|-------------|---------|
+| **Docker** | [Docker Desktop](https://www.docker.com/get-started) |
+| **XradiaPy** | Mount from host if available |
+
+### Option B: Local Python
+
+| Requirement | Details |
+|-------------|---------|
+| **Python** | 2.7.x (required for XradiaPy) |
+| **XradiaPy** | From Zeiss Xradia Software Suite |
+| **IDE** | PyCharm (recommended) |
+| **OS** | Windows, macOS, or Linux |
+
+---
 
 ## Installation
 
-1. Clone the repository:
+Choose your preferred method:
+
+| Method | Best For | Guide |
+|--------|----------|-------|
+| **Docker** | Quick setup, no Python needed | [DOCKER.md](DOCKER.md) |
+| **One-Click** | Windows/Mac users | Run `run.bat` or `./run.sh` |
+| **Manual** | Full control | [INSTALL.md](INSTALL.md) |
+
+### Quick Setup (Local Python)
+
 ```bash
-git clone https://github.com/yourusername/X-radia-metadata.git
-cd X-radia-metadata
+# Run the smart launcher - it checks everything and guides you
+python start.py
 ```
 
-2. Set up in PyCharm:
-   - Open PyCharm
-   - File -> Open -> Select the `X-radia-metadata` directory
-   - Configure Python Interpreter:
-     - File -> Settings -> Project -> Python Interpreter
-     - Select Python 2.7 interpreter with XradiaPy package
+The launcher will:
+- Show what's installed (with versions)
+- Highlight what's missing
+- Offer to install dependencies
+- Start the app when ready
+
+---
 
 ## Project Structure
 
 ```
 X-radia-metadata/
-├── new_enhanced_interactive/        # Main package
-│   ├── config/                      # Configuration handling
-│   ├── metadata/                    # Metadata extraction
-│   ├── processors/                  # TXRM processing
-│   ├── utils/                      # Utility functions
-│   └── tests/                      # Test files and mocks
-├── scripts/                        # Legacy standalone scripts
-└── main.py                         # Entry point
+├── new_enhanced_interactive/     # Main package
+│   ├── config/                   # Configuration modules
+│   │   ├── watch_config.py       # Watch mode settings
+│   │   ├── user_config.py        # User preferences
+│   │   └── txrm_config_converter.py
+│   ├── metadata/                 # Metadata extraction
+│   │   └── metadata_extractor.py # Core extractor
+│   ├── processors/               # File processing
+│   │   └── txrm_processor.py     # TXRM file processor
+│   ├── utils/                    # Utilities
+│   │   ├── file_utils.py         # File operations
+│   │   ├── file_watcher.py       # Directory monitoring
+│   │   ├── github_utils.py       # GitHub integration
+│   │   └── validation_utils.py   # File validation
+│   └── main.py                   # Main entry point
+├── scripts/                      # Legacy standalone scripts
+├── contacts.csv                  # Contact information
+├── requirements.txt              # Python dependencies
+├── setup.py                      # Package installation
+├── system_check.py               # System diagnostics
+├── setup_wizard.py               # Interactive setup
+├── INSTALL.md                    # Installation guide
+└── Readme.md                     # This file
 ```
 
-## Configuration
-
-### Basic Configuration
-
-The tool can run without any additional configuration. By default, it will:
-- Process TXRM files in the specified directory
-- Generate metadata text files next to each TXRM file
-- Create a cumulative CSV in the output directory
-- Not use GitHub integration
-
-### Optional GitHub Integration
-
-GitHub integration is completely optional. If you want to automatically push metadata updates to a GitHub repository:
-
-1. Create a Personal Access Token:
-   - Go to GitHub -> Settings -> Developer settings -> Personal access tokens
-   - Generate new token with 'repo' scope
-   - Copy the token
-
-2. Configure in `watch_config.py`:
-```python
-GITHUB_CONFIG = {
-    'enabled': True,  # Set to False to disable GitHub integration
-    'token': 'your_github_token',
-    'repo_owner': 'your_github_username',
-    'repo_name': 'your_repo_name',
-    'branch': 'main'
-}
-```
-
-### Path Configuration
-
-In `watch_config.py`, set up your watch directories:
-```python
-WATCH_CONFIG = {
-    'watch_paths': [
-        r'C:\Path\To\Your\TXRM\Files',
-        # Add more paths as needed
-    ],
-    'file_pattern': '*.txrm'
-}
-```
+---
 
 ## Usage
 
-### Basic Usage
+### Interactive Mode (Default)
 
-The simplest way to run the tool is through PyCharm:
-
-1. Open `main.py`
-2. Run the script (Shift+F10 or green play button)
-3. Follow the interactive prompts to:
-   - Select the directory containing TXRM files
-   - Choose processing mode (batch or interactive)
-   - Specify output location
-
-### Advanced Usage
-
-The tool supports various command-line options:
+Run the main script and follow the prompts:
 
 ```bash
-# Basic processing (no GitHub)
-python main.py --path /path/to/txrm/files
-
-# Watch mode without GitHub
-python main.py --watch --path /path/to/watch
-
-# Process with GitHub integration
-python main.py --path /path/to/txrm/files --github
-
-# Watch mode with GitHub
-python main.py --watch --path /path/to/watch --github
-
-# Process single file
-python main.py --file /path/to/single/file.txrm
-
-# Explicitly disable GitHub (same as not using --github)
-python main.py --path /path/to/txrm/files --no-github
+python new_enhanced_interactive/main.py
 ```
 
-### Running Modes
+You'll be guided through:
+1. Selecting the directory containing TXRM files
+2. Choosing processing mode (batch or interactive)
+3. Configuring output options
 
-1. **Interactive Mode** (Default):
-   - Prompts for all settings
-   - Confirms each file before processing
-   - Shows real-time progress
+### Batch Mode
 
-2. **Batch Mode**:
-   - Processes all files without confirmation
-   - Useful for large directories
+Process all files without confirmation:
 
-3. **Watch Mode**:
-   - Monitors directory for new files
-   - Automatically processes new files
-   - Optional GitHub integration
+```bash
+python new_enhanced_interactive/main.py
+# Select option 1 (Manual processing)
+# Choose option 1 (Process all files - batch)
+```
 
-### Expected Outputs
+### Watch Mode
 
-For each processed TXRM file, the following outputs are generated:
+Monitor a directory for new TXRM files:
 
-1. Text Metadata File (`*_metadata.txt`):
-   - Located next to the source TXRM file
-   - Contains detailed metadata in human-readable format
-   - Includes basic info, machine settings, and image properties
+```bash
+python new_enhanced_interactive/main.py
+# Select option 2 (Watch mode)
+```
 
-2. Configuration File (`*_config.txt`):
-   - Located next to the source TXRM file
-   - Contains machine configuration parameters
+---
 
-3. Cumulative CSV File:
-   - Located in the output directory
-   - Combines metadata from all processed files
-   - Filename format: `cumulative_metadata_YYYYMMDD_HHMMSS.csv`
-   - Contains standardized columns for all metadata fields
+## Configuration
 
-### Column Descriptions in CSV
+### Environment File (.env)
 
-- `file_name`: Name of the TXRM file without extension
-- `ct_voxel_size_um`: Voxel size in micrometers
-- `ct_objective`: Objective lens used
-- `xray_tube_voltage`: X-ray tube voltage
-- `xray_tube_power`: X-ray tube power
-- `xray_tube_current`: Calculated current (power/voltage * 100)
-- (See code documentation for complete column list)
+Copy `.env.example` to `.env` and customize:
+
+```bash
+cp .env.example .env
+```
+
+Key settings:
+
+```ini
+# XradiaPy library path
+XRADIA_PYTHON_PATH=/path/to/xradia/python
+
+# Default directories
+DEFAULT_TXRM_DIRECTORY=/path/to/txrm/files
+DEFAULT_OUTPUT_DIRECTORY=/path/to/output
+
+# Watch mode
+WATCH_MODE_ENABLED=false
+WATCH_DIRECTORY=/path/to/watch
+WATCH_POLLING_INTERVAL=60
+```
+
+### Watch Mode Configuration
+
+Configure watch mode interactively:
+
+```bash
+python new_enhanced_interactive/main.py
+# Select option 3 (Configure watch mode)
+```
+
+### Contacts File
+
+The `contacts.csv` file tracks metadata attribution:
+
+```csv
+name,email,uniqueID
+John Smith,john.smith@example.com,1001
+Jane Doe,jane.doe@example.com,1002
+```
+
+---
+
+## Output Files
+
+For each processed TXRM file, the tool generates:
+
+### 1. Metadata Text File (`*_metadata.txt`)
+
+Human-readable metadata including:
+- Basic file information
+- Machine settings (voltage, power, current)
+- Image properties (resolution, voxel size)
+- Projection data
+
+### 2. Configuration File (`*_config.txt`)
+
+Machine configuration parameters for reproducibility.
+
+### 3. Cumulative CSV
+
+Combined metadata from all processed files:
+- Filename: `cumulative_metadata_YYYYMMDD_HHMMSS.csv`
+- Contains standardized columns for all metadata fields
+- Useful for data analysis and comparison
+
+---
+
+## CSV Column Reference
+
+| Column | Description |
+|--------|-------------|
+| `file_name` | TXRM filename without extension |
+| `ct_voxel_size_um` | Voxel size in micrometers |
+| `ct_objective` | Objective lens used |
+| `xray_tube_voltage` | X-ray tube voltage (kV) |
+| `xray_tube_power` | X-ray tube power (W) |
+| `xray_tube_current` | Calculated current (mA) |
+| `ct_exposure_time` | Exposure time per projection |
+| `ct_projections` | Number of projections |
+| ... | See code for complete list |
+
+---
+
+## GitHub Integration (Optional)
+
+Automatically push metadata updates to GitHub:
+
+1. Generate a Personal Access Token:
+   - GitHub → Settings → Developer settings → Personal access tokens
+   - Generate token with `repo` scope
+
+2. Configure in `.env`:
+   ```ini
+   GITHUB_ENABLED=true
+   GITHUB_TOKEN=your_token_here
+   GITHUB_REPO_OWNER=your_username
+   GITHUB_REPO_NAME=your_repo
+   GITHUB_BRANCH=main
+   ```
+
+---
+
+## System Check
+
+Run diagnostics to verify your setup:
+
+```bash
+python system_check.py
+```
+
+This checks:
+- Python version and path
+- XradiaPy installation
+- Required dependencies
+- Xradia software location
+- File permissions
+
+---
 
 ## Troubleshooting
 
-1. XradiaPy Import Error:
-   - Ensure Xradia software is installed
-   - Verify Python 2.7 is being used
-   - Check PYTHONPATH includes Xradia installation directory
+### XradiaPy Import Error
 
-2. Permission Issues:
-   - Run PyCharm as administrator
-   - Check file/directory permissions
+```
+ImportError: No module named XradiaPy
+```
 
-3. GitHub Integration Issues (only if using GitHub):
-   - Verify token permissions
-   - Check network connectivity
-   - Ensure correct repository configuration
-   - Try running without GitHub integration first
+**Solution**: Add Xradia Python directory to PYTHONPATH:
 
-## Legacy Scripts
+```bash
+# Windows
+set PYTHONPATH=%PYTHONPATH%;C:\Program Files\Xradia\Python
 
-The `scripts/` directory contains standalone versions of the metadata extractor:
-- `MetadataExtractor.py`: Basic metadata extraction
-- `InteractiveTXRMProcessor.py`: Interactive processing
-- `enhanced_interactive.py`: Enhanced interactive version
-- `CompleteAPIMetadataExtractor.py`: Complete API implementation
+# macOS/Linux
+export PYTHONPATH=$PYTHONPATH:/opt/xradia/python
+```
 
-These are maintained for reference but the main functionality has been integrated into the new package structure.
+### Python Version Error
+
+```
+SyntaxError: invalid syntax
+```
+
+**Solution**: Ensure you're using Python 2.7:
+
+```bash
+python2.7 new_enhanced_interactive/main.py
+```
+
+### Permission Denied
+
+**Solution**: 
+- Windows: Run PyCharm as Administrator
+- Unix: Check file permissions with `ls -la`
+
+---
+
+## Development
+
+### Running Tests
+
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+```
+
+### Linting
+
+```bash
+pylint new_enhanced_interactive/
+```
+
+### Mock XradiaPy
+
+For development without Xradia software, use the mock:
+
+```python
+# The mock is at: new_enhanced_interactive/tests/mocks/XradiaPy.py
+import sys
+sys.path.insert(0, 'new_enhanced_interactive/tests/mocks')
+```
+
+---
 
 ## Contributing
 
 1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Commit your changes: `git commit -am 'Add my feature'`
+4. Push to the branch: `git push origin feature/my-feature`
 5. Create a Pull Request
+
+---
 
 ## License
 
-[Your License Here]
+MIT License - see LICENSE file for details.
+
+---
+
+## Support
+
+- **Documentation**: [INSTALL.md](INSTALL.md)
+- **Issues**: GitHub Issues page
+- **System Check**: Run `python system_check.py`
+
+---
+
+*X-radia Metadata Extractor - Making TXRM metadata accessible*
